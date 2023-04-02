@@ -1,0 +1,48 @@
+CHECKLIST DE EQUIPAMENTOS:
+
+  1) Rádio Taranis + Receptor X8R (Controle remoto)
+  2) Rádio de telemetria HolyBro (Telemetria para o Mission Planner)
+  3) Laptop para programar e usar o Mission Planner
+  4) Extensões elétricas com múltiplas vias.
+  5) Bomba para encher o pneu 
+  6) Carregador de baterias para carregar a bateria
+  7) Alicate de pressão para prender o motor
+  8) Estação de solda + Estanho + Esponja metálica não abrasiva
+  9) Totem de jumpers Dupont
+  10) Equipamentos de medição: multímetros convencionais, multimetros com medição de corrente não intrusiva DC, osciloscópio,
+  rastreador de cabos, analisador lógico para averiguar UART, I2C, SPI e outros protocolos seriais.
+  11) Kit de laminação - Silicone, fibra de vidro, luvas químicas, tubo aplicador de silicone, cola quente (pode ser dissolvido
+  com alcool isopropilico)
+  12) Diário de bordo para ficar dentro do barco.
+
+CHECKLIST OPERACIONAL:
+  
+  0) Preencher as checklists
+  1) Usar bomba para encher o pneu
+  2) Medir tensão da bateria e carregá-la com carregador de bateria (VER SE ESTÁ CONFIGURADO PARA 12V)
+  3) Checar visualmente as caixas para ver se os fios estão devidamente conectados e se não há nenhuma umidade nelas.
+  4) Checar se as chaves manuais estão acionadas( Disjuntor, contatora, chaves do guincho e do leme, conectores do motor de popa)
+    -Disjuntor: barra vermelha = LIGADO / barra verde = DESLIGADO
+    -Contatora: Erguida: LIGADA / Pressionada = DESLIGADA
+    -Chaves: checar posições
+    -Conectores - conectar
+  5) Checar se os fusíveis da caixa de fusíveis estão bons (Retirar, colocar contra luz e analisar se o fio ainda está dentro)
+  6) Se tudo estiver funcionando, ligar o disjuntor por último.
+  
+  Calibrações:
+    LEME:
+      1) Desengatar potenciômetros
+      2) Colocar ele no valor intermediário de resistência: (R/2) ou (VCC/2) pelo multimetro ou monitor serial.
+      O valor intermediário deve resultar em conversão ADC de 512 no monitor serial.
+      3) Alinhar o leme com a proa manualmente engatando 12V diretamente por cabos livres.
+      4) Engatar potenciômetro e averiguar se ele não sambou durante o encaixe, usando o multimetro ou o monitor serial.
+      5) Manualmente mover o leme para as extremidades e anotar os valores de tensão e conversão ADC resultantes, que servirão
+      como os valores de extremidade para função de mapeamento.
+    GUINCHO:
+      1) Desengatar potenciômetro
+      2) Colocá-lo no valor que o faça ter 2V na saída, que corresponderá ao angulo de 0 graus, alinhando a vela com a proa.
+      3) Ver se há bastante corda disponível, caso não, atuar o guincho manualmente para dar mais corda.
+      4) Engatar potenciômetro.
+      5) Atuar o guincho manualmente até chegar em 90 graus. Isso deve elevar o valor do sinal de saída para 4V.
+      
+  

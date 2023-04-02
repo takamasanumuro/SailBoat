@@ -1,0 +1,17 @@
+0) Desembarque dos equipamentos e montagem das mesas
+1) Forro removido
+2) Carregamento de bateria
+3) Conexões de multímetros e osciloscópio
+4) Bindagem do rádio com o receptor
+5) Teste dos sinais com multímetro e osciloscópio
+6) Funcionou! O problema era o binding.
+
+Fomos almoçar:
+
+7) Barco parou de funcionar assim que voltamos. Desligamos tudo, então ligamos o disjuntor antes de conectar o Arduino a USB, então
+voltou a funcionar. Parece que a conexão USB influencia certos comportamentos da inicialização do barco.
+
+  Erros que ainda persistem:
+    Sinais anômalos intermitentes causando solavanco no motor
+    Fazer manivela para fixação do motor
+    Averiguar lentidão nos comandos seriais (provavelmente funções bloqueantes dando timeout)
