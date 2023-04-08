@@ -4,22 +4,23 @@
 #include "RudderCheck.hpp"
 
                                                                                                                                                                                                                                                                                                                                                  #include "DualVNH5019MotorShield.h" //drive motor
-UN178Driver sternBridge = UN178Driver(2, 3, 4, 5, 6, 7); // Stern motor and rudder respectively - Digital/Digital/PWM order of pins // Output pins for motor drivers
+UN178Driver sternBridge = UN178Driver(52, 53, 2, 5, 6, 7); // Stern motor and rudder respectively - Digital/Digital/PWM order of pins // Output pins for motor drivers
 UN178Driver winchBridge = UN178Driver(8, 9, 10); // Winch motor - Digital/Digital/PWM order of pins // Output pins for motor drivers
 constexpr uint8_t sailPinPotentiometer = A0;
 constexpr uint8_t rudderPinPotentiometer = A1;
 // Following constants were taken using a multimeter after setting the potentiometer to mid (5k) resistance and aligning the rudder to the center of the boat
-constexpr int16_t rudderAngleOffset = 8;  // To align the rudder to the bow of the boat
+constexpr int16_t rudderAngleOffset = 0;  // To align the rudder to the bow of the boat
 constexpr int16_t sailAngleOffset = 0;  // To align the rudder to the bow of the boat
-constexpr int16_t rudderADCMinThreshold = 365;  // Rudder -37 degrees (Starboard)
-constexpr int16_t rudderADCMaxThreshold = 796;  // Rudder 57 degrees (Port)
+constexpr int16_t rudderADCMinThreshold = 320;  // Rudder -37 degrees (Starboard) 494
+constexpr int16_t rudderADCMiddleThreshold = 516;
+constexpr int16_t rudderADCMaxThreshold = 750;  // Rudder 57 degrees (Port) 554 = /
 constexpr int16_t sailADCMinThreshold = 400; // 2V that corresponds to 90 sail degree
 constexpr int16_t sailADCMaxThreshold = 800; // 4V that corresponds to zero sail degree
 
 constexpr uint16_t pixhawkMinimalPWM = 993;
 constexpr uint16_t pixhawkMaximumPWM = 1986;
-constexpr int16_t rudderMinAngle = -50; // Rudder -37 degrees (Starboard) 
-constexpr int16_t rudderMaxAngle = 50;  // Rudder 57 degrees (Port)
+constexpr int16_t rudderMinAngle = -45; // Rudder -45 degrees (Starboard) 
+constexpr int16_t rudderMaxAngle = 45;  // Rudder 57 degrees (Port)
 constexpr int16_t sailMinAngle = 0;
 constexpr int16_t sailMaxAngle = 90;
 
@@ -36,12 +37,22 @@ enum PrintSelection {
   PrintSail = 1,
   PrintThrottle = 2
 };
-uint8_t printSelectionIndex = PrintRudder;
+uint8_t printSelectionIndex = PrintThrottle;
+
+enum throttleSelectionIndex {
+  MOTOR_OFF,
+  MOTOR_FORWARD,
+  MOTOR_OFF_2,
+  MOTOR_BACK
+};
+
+int throttleSpeedTest = 50;
+int throttleSelectionIndex = MOTOR_OFF;
 
 // Flags for conditional compilation
-#define PRINT_RUDDER
-#define PRINT_SAIL
-#define PRINT_THROTTLE
+#define PRINT_RUDDER 1
+#define PRINT_SAIL 1
+#define PRINT_THROTTLE 1
 //#define PRINT_RUDDER_READINGS
 //#define PRINT_SAIL_READINGS
 
@@ -125,6 +136,27 @@ void RudderControl(int rudder_angle_desired) {
   int rudder_adc_reading = analogRead(rudderPinPotentiometer);
   int rudder_angle_present = map(rudder_adc_reading, rudderADCMinThreshold, rudderADCMaxThreshold, rudderMinAngle, rudderMaxAngle);
   rudder_angle_present += rudderAngleOffset;
+  // port = negative PWM, starboard = positive PWM
+  if (rudder_angle_present < rudderMinAngle) { // if exceeded port, command to starboard
+    while (analogRead(rudderPinPotentiometer) < rudderADCMinThreshold) {
+      sternBridge.setPWM(UN178Driver::maxPWM, UN178Driver::M2);
+      static timer rudder_timer = millis();
+      if (millis() - rudder_timer > 500) {
+        rudder_timer = millis();
+        Serial.print("Rudder ADC: "); Serial.println(rudder_adc_reading);
+      }
+    }
+  } else if (rudder_angle_present > rudderMaxAngle) { // if exceeded starboard, command to port
+    while (analogRead(rudderPinPotentiometer) > rudderADCMaxThreshold) {
+      sternBridge.setPWM(-UN178Driver::maxPWM, UN178Driver::M2);
+      static timer rudder_timer = millis();
+      if (millis() - rudder_timer > 500) {
+        rudder_timer = millis();
+        Serial.print("Rudder ADC: "); Serial.println(rudder_adc_reading);
+      }
+    }
+  }
+  
   int rudder_error = rudder_angle_desired - rudder_angle_present;
   int rudder_output_pwm = PID_Proportional(rudder_error, rudder_proportional_constant) + PID_Integral(rudder_error, rudder_integral_constant);
   rudder_output_pwm = constrain(rudder_output_pwm, -UN178Driver::maxPWM, UN178Driver::maxPWM);// Constrains output given H-bridge PWM output range,
@@ -179,26 +211,61 @@ void SailControl(int sail_angle_desired) {
 void ThrottleControl(int16_t throttle_signal) {
   static constexpr int16_t throttle_buffer = 200;
   static constexpr int16_t throttle_trim = 1500;
-  throttle_signal = constrain(throttle_signal, 1000, 2000);
-  if (throttle_signal > throttle_trim + throttle_buffer) {
-    map(throttle_signal, throttle_trim + throttle_buffer, 2000, 0, UN178Driver::maxPWM);
-    sternBridge.setPWM(throttle_signal, UN178Driver::M1);
+  static constexpr int16_t min_pixhawk_pwm = 975;
+  static constexpr int16_t max_pixhawk_pwm = 2000;
+  static uint32_t control_index = 0;
+  static uint32_t error_counter = 0;
+  static int16_t previous_throttle_signal = 1500;
+  
+  int16_t raw_signal_debug = throttle_signal;
+  int16_t raw_signal_debug_constrain = throttle_signal;
+  //throttle_signal = (9*throttle_signal + throttle_signal) / 10;
+  if (throttle_signal < min_pixhawk_pwm || throttle_signal > max_pixhawk_pwm) { //! Random signals inside this band won't be processed
+    //Serial.print("*******************************\n");
+    //Serial.print("Throttle signal out of range: "); Serial.println(throttle_signal);
+    //Serial.print("Setting previous PWM: "); Serial.println(previous_throttle_signal);
+    //Serial.print("Error counter: "); Serial.println(error_counter);
+    //Serial.print("Index: "); Serial.println(control_index);
+    throttle_signal = previous_throttle_signal;
+    control_index++;
+    error_counter++;
+    //Serial.print("*******************************\n");
+    //Serial.print("\n");
+    //sternBridge.setPWM(previous_throttle_signal, UN178Driver::M1); //!Solavanco com motor ativado e passivo
+    //sternBridge.setPWM(0, UN178Driver::M1); //! Causa solavanco com motor ativado, mas n passivo
   }
-  else if (throttle_signal < throttle_trim - throttle_buffer) {
-    map(throttle_signal, 1000, throttle_trim - throttle_buffer, UN178Driver::maxPWM, 0);
-    throttle_signal = -throttle_signal;
-    sternBridge.setPWM(throttle_signal, UN178Driver::M1);
+  previous_throttle_signal = throttle_signal;
+  throttle_signal = constrain(throttle_signal, 1000, 2000);
+  raw_signal_debug_constrain = constrain(raw_signal_debug_constrain, 1000, 2000);
+  if (throttle_signal > throttle_trim + throttle_buffer) {
+    throttle_signal = map(throttle_signal, throttle_trim + throttle_buffer, 2000, 0, UN178Driver::maxPWM);
+    sternBridge.setPWM(throttle_signal, UN178Driver::M1); 
+    Serial.print("IF+ Throttle: "); Serial.println(throttle_signal);
+    Serial.print("RAW: "); Serial.println(raw_signal_debug);
+  }
+  else if (throttle_signal < (throttle_trim - throttle_buffer)) {
+    throttle_signal = map(throttle_signal, 1000, throttle_trim - throttle_buffer, UN178Driver::maxPWM, 0);
+    //throttle_signal = -throttle_signal;
+    sternBridge.setPWM(-throttle_signal, UN178Driver::M1);
+    Serial.print("IF- Throttle: "); Serial.println(throttle_signal);
+    Serial.print("RAW: "); Serial.println(raw_signal_debug);
   }
   else {
     sternBridge.setPWM(0, UN178Driver::M1);
   }
 
-  #ifdef PRINT_THROTTLE
+  //Serial.print("Prev throttle: "); Serial.println(previous_throttle_signal);
+  
+  #if !PRINT_THROTTLE
   if (printSelectionIndex == PrintThrottle) {
     static uint32_t throttle_read_timer = millis();
-    if (millis() - throttle_read_timer < 1500) return;
+    if (millis() - throttle_read_timer < 600) return;
     throttle_read_timer = millis();
-    Serial.print("Throttle signal: "); Serial.println(throttle_signal);
+    Serial.print("Raw throttle signal: "); Serial.println(raw_signal_debug);
+    Serial.print("Constrained throttle signal: "); Serial.println(raw_signal_debug_constrain);
+    Serial.print("Output signal: "); Serial.println(throttle_signal);
+    Serial.print("Index: "); Serial.println(control_index); Serial.print('\n');
+    control_index++;
   }
   #endif 
 }
@@ -308,9 +375,36 @@ void MAVLinkToPixhawk(MAVLink_options option, float data) {
   }  
  
   // Copy the message to the send buffer
-  //uint16_t length = mavlink_msg_to_send_buffer(buffer, &msg);
+  uint16_t length = mavlink_msg_to_send_buffer(buffer, &msg);
   // Send the message with the standard UART send function
-  //Serial3.write(buffer, length);
+  Serial3.write(buffer, length);
+}
+
+
+void ThrottleControlTest() {
+  switch (throttleSelectionIndex) {
+    case MOTOR_OFF:
+      sternBridge.setPWM(throttleSpeedTest, UN178Driver::M1);
+      break;
+    case MOTOR_FORWARD:
+      sternBridge.setPWM(throttleSpeedTest, UN178Driver::M1);
+      break;
+    case MOTOR_OFF_2:
+      sternBridge.setPWM(throttleSpeedTest, UN178Driver::M1);
+      break;
+    case MOTOR_BACK:
+      sternBridge.setPWM(-throttleSpeedTest, UN178Driver::M1);
+      break;
+  }
+}
+
+void PrintTestThrottleVariables(uint32_t time_interval = 1000) {
+  static uint32_t print_timer = 0;
+  if (millis() - print_timer < time_interval) return;
+  print_timer = millis();
+
+  Serial.print("Throttle selection index: "); Serial.println(throttleSelectionIndex);
+  Serial.print("Throttle speed test: "); Serial.println(throttleSpeedTest);
 }
 
 void GetSerialInput() {
@@ -322,6 +416,18 @@ void GetSerialInput() {
         ++printSelectionIndex;
         if (printSelectionIndex > PrintSelection::PrintThrottle) printSelectionIndex = PrintSelection::PrintRudder;
         Serial.print("Print selection: "); Serial.println(printSelectionIndex);
+        break;
+      case 't':
+        throttleSpeedTest += 50;
+        if (throttleSpeedTest > 255) {
+          throttleSpeedTest = 50;
+        }
+        break;
+      case 'm':
+        throttleSelectionIndex++;
+        if (throttleSelectionIndex > MOTOR_BACK) {
+          throttleSelectionIndex = MOTOR_OFF;
+        }
         break;
     }
   }

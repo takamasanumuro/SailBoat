@@ -1,0 +1,35 @@
+1) Checagem dos equipamentos feita na UFF
+2) Checagem operacional feita no Fboat- Bateria medida, carregada, fusiveis averiguados, conectores, estado de conexões das caixas.
+3) Teste do estado atual do barco: solavancos constantes mesmo sem comando de atuação do motor de popa.
+4) Programamos e testamos fltragem ao longo do dia. Conseguimos rejeitar 95% dos sinais ruídosos. Alguns sinais que ainda persistem
+são mais raros e acontecem dentro da faixa de PWMs aceitáveis para o controle (1000 a 2000us). Uma média móvel pode ser programada
+posteriormente para resolver isso. Programamos também uma subrotina para fazer o leme voltar automaticamente para o centro caso ele
+se encontre fora dos limites aceitáveis de ângulos de comando.
+5) Fizemos a calibração do leme que consiste em:
+
+  1)Desengatar o potenciômetro do leme e verificar se estão chegando 5V corretamente em suas extremidades. Essa tensão deve 
+  ser estável e sem ruídos.ceu centro, de forma que a tensão de saída seja 2,5V, que deve corresponder a uma leitura de ADC
+  de 512 no conversor analógico-digital do Arduino. Isso é feito para garantir que haja uma amplitude simétrica de atuação possível para
+  ambos os lados do leme.
+  3) Usar o cabo de 12V para atuar manualmente o leme para fazer o mapeamento das constantes que serão usadas no programa. Coloque
+  o leme em uma das extremidades e anote a saída ADC resultante e use um transferidor para ver qual ângulo em relação à proa o leme está.
+  Repita o mesmo para a outra extremidade. 
+  4) Alinhe o leme com a proa do barco e prepare-se para encaixar o potenciômetro, que foi setado no seu ponto médio anteriormente na etapa
+  1. Ao fazer o encaixe e apertar o parafuso, é muito provável que ele sambe um pouco e saia da posição central, então uma solução é girar ele
+  um pouco mais ou pouco menos do centro, de acordo com o desvio resultante que tinha sido causado pelo encaixe.
+  Por exemplo, se, ao encaixar, a saída ADC saiu de 512 para 400, então rode o potenciômetro para um ADC resultante de 612 e efetue o encaixe,
+  assim corrigindo o erro já tendo em mente a correção da sambagem.
+  5) Teste o leme com o controle remoto. Veja se está atuando corretamente. Ajuste as constantes PI para ter uma melhor resposta se necessário.
+  6) Caso o leme vá para uma extremidade e fique travado nela, pode significar duas coisas:
+    I) O sinal de saída está com sinal incorreto, portanto está reforçando o erro em vez de corrígi-lo. Multiplique o sinal de saída por -1
+    no programa e veja se corrige o problema
+    II) A posição atual do leme está além dos limites estabelecidos pelas constantes. Por exemplo, está em 50 graus, sendo que o angulo
+    maximo permitido é de 35 graus. Isso resulta em um cenário no qual o sinal do erro nunca irá alterar sua polaridade, independente
+    de qual ângulo seja enviado como controle, pois todos estarão abaixo de 50 graus. Para resolver isso, alinhe o leme com a proa manualmente
+    com o cabo de 12V. 
+    Para evitar esses cenários, seria bom implementar um relé que só ativasse o leme após a inicialização completa do Arduino e implementar
+    uma subrotina que detectasse esse cenário e automaticamente retornasse o leme para o centro. depois disso retornando o controle de volta
+    para o sistema PI.
+
+6) Chegou o anoitecer, então encerramos nossas atividades. Deixamos o Fboat coberto com a lona em um local protegido da chuva perto dos armários.
+7) Para a próxima ida, ficou a atividade de averiguar e calibrar o guincho.

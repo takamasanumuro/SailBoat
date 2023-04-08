@@ -23,18 +23,18 @@ UN178Driver::UN178Driver(unsigned char INA1,
 }
 
 void UN178Driver::init() {
-  pinMode(_INA1,OUTPUT);
-  pinMode(_INB1,OUTPUT);
-  pinMode(_PWM1,OUTPUT);
-  pinMode(_INA2,OUTPUT);
-  pinMode(_INB2,OUTPUT);
-  pinMode(_PWM2,OUTPUT);
+  pinMode(_INA1,OUTPUT); digitalWrite(_INA1,LOW);
+  pinMode(_INB1,OUTPUT); digitalWrite(_INB1,LOW);
+  pinMode(_PWM1,OUTPUT); digitalWrite(_PWM1,LOW);
+  pinMode(_INA2,OUTPUT); digitalWrite(_INA2,LOW);
+  pinMode(_INB2,OUTPUT); digitalWrite(_INB2,LOW);
+  pinMode(_PWM2,OUTPUT); digitalWrite(_PWM2,LOW);
 }
 
 void UN178Driver::init_channel_A() {
-  pinMode(_INA1,OUTPUT);
-  pinMode(_INB1,OUTPUT);
-  pinMode(_PWM1,OUTPUT);
+  pinMode(_INA1,OUTPUT); digitalWrite(_INA1,LOW);
+  pinMode(_INB1,OUTPUT); digitalWrite(_INB1,LOW);
+  pinMode(_PWM1,OUTPUT); digitalWrite(_PWM1,LOW);
 }
 
 void UN178Driver::setPWM(int pwm, UN178Channel channel) {
