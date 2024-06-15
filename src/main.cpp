@@ -4,11 +4,9 @@
 #include "main.hpp"
 #include "Callback.h"
 
-HBridgeDriver throttleMotor = HBridgeDriver(52, 53, 2, 5, 6, 7); // Stern motor and rudder respectively - Digital/Digital/PWM order of pins // Output pins for motor drivers
-HBridgeDriver winchActuator = HBridgeDriver(8, 9, 10); // Winch motor - Digital/Digital/PWM order of pins // Output pins for motor drivers
-HBridgeDriver rudderActuator = HBridgeDriver(43, 42, 44); // Rudder actuator - Digital/Digital/PWM order of pins // Output pins for motor drivers
-
-// Following constants were taken using a multimeter after setting the potentiometer to mid (5k) resistance and aligning the rudder to the center of the boat
+HBridgeDriver throttleMotor = HBridgeDriver(41, 40, 45);   // Digital/Digital/PWM order of pins
+HBridgeDriver rudderActuator = HBridgeDriver(43, 42, 44);  // Digital/Digital/PWM order of pins
+HBridgeDriver winchActuator = HBridgeDriver(39, 38, 46);   // Digital/Digital/PWM order of pins
 
 constexpr uint8_t rudderPinPotentiometer = A6;
 constexpr int16_t rudderAngleOffset = 0;  // To align the rudder to the bow of the boat
@@ -88,8 +86,9 @@ void printPixhawkArray() {
 }
 
 int rudderAngleCommand = 0;
+int throttleSpeedCommand = 1500;
 
-void ParseRudderCommand(const char* message) {
+void ParseActuatorCommands(const char* message) {
 	int length = strlen(message);
 	if (length < 2) return;
 
@@ -98,6 +97,12 @@ void ParseRudderCommand(const char* message) {
 		constrain(angle, rudderMinAngle, rudderMaxAngle);
 		Serial.print("Setting rudder angle to: "); Serial.println(angle);
 		rudderAngleCommand = angle;
+	}
+
+	if (message[0] == 't' || message[0] == 'T') {
+		int speed = atoi(message + 1);
+		Serial.print("Setting throttle speed to: "); Serial.println(speed);
+		throttleSpeedCommand = speed;
 	}
 }
 
@@ -110,11 +115,13 @@ void setup() {
 
     throttleMotor.init_channel_A(); // Controls the throttle motor
 	rudderActuator.init_channel_A(); // Controls the rudder actuator
+	winchActuator.init_channel_A(); // Controls the winch actuator
     pinMode(rudderPinPotentiometer, INPUT); // Feedback for rudder PID
+	pinMode(sailPinPotentiometer, INPUT); // Feedback for sail PID
     //for (auto& pixHawkReadingPin : pixHawkReadingPins) pinMode(pixHawkReadingPin, INPUT); // Input pins to read PWM control signals coming from Pixhawk
 
-	FunctionSlot<const char*> parseRudderCommandSlot(ParseRudderCommand);
-	serialInputSignal.attach(parseRudderCommandSlot);
+	FunctionSlot<const char*> parseActuatorCommandsSlot(ParseActuatorCommands);
+	serialInputSignal.attach(parseActuatorCommandsSlot);
 
 }
 
@@ -130,6 +137,7 @@ void loop() {
 	//ReadRudder();
 	GetSerialInput();
 	RudderControl(rudderAngleCommand);
+	ThrottleControl(throttleSpeedCommand);
 }
 
 float PID_Proportional(float present_error, float proportional_gain) {
@@ -233,66 +241,31 @@ void SailControl(int sail_angle_desired) {
   	#endif
 }
 
-void ThrottleControl(int16_t throttle_signal) {
-  	static constexpr int16_t throttle_buffer = 200;
-  	static constexpr int16_t throttle_trim = 1500;
-  	static constexpr int16_t min_pixhawk_pwm = 975;
-  	static constexpr int16_t max_pixhawk_pwm = 2000;
-  	static uint32_t control_index = 0;
-  	static uint32_t error_counter = 0;
-  	static int16_t previous_throttle_signal = 1500;
+void ThrottleControl(int16_t throttle_signal_pwm) {
+  	constexpr int16_t pixhawk_min_pwm = 975;
+  	constexpr int16_t pixhawk_trim_pwm = 1500;
+  	constexpr int16_t pixhawk_max_pwm = 2000;
+  	constexpr int16_t pixhawk_throttle_deadzone = 200;
+
+  	static int16_t previous_valid_throttle_signal = 1500;
 	
-  	int16_t raw_signal_debug = throttle_signal;
-  	int16_t raw_signal_debug_constrain = throttle_signal;
-  	//throttle_signal = (9*throttle_signal + throttle_signal) / 10;
-  	if (throttle_signal < min_pixhawk_pwm || throttle_signal > max_pixhawk_pwm) { //! Random signals inside this band won't be processed
-  	  	//Serial.print("*******************************\n");
-  	  	//Serial.print("Throttle signal out of range: "); Serial.println(throttle_signal);
-  	  	//Serial.print("Setting previous PWM: "); Serial.println(previous_throttle_signal);
-  	  	//Serial.print("Error counter: "); Serial.println(error_counter);
-  	  	//Serial.print("Index: "); Serial.println(control_index);
-  	  	throttle_signal = previous_throttle_signal;
-  	  	control_index++;
-  	  	error_counter++;
-  	  	//Serial.print("*******************************\n");
-  	  	//Serial.print("\n");
-  	  	//throttleMotor.setPWM(previous_throttle_signal, UN178Driver::M1); //!Solavanco com motor ativado e passivo
-  	  	//throttleMotor.setPWM(0, UN178Driver::M1); //! Causa solavanco com motor ativado, mas n passivo
-  	}
-  	previous_throttle_signal = throttle_signal;
-  	throttle_signal = constrain(throttle_signal, 1000, 2000);
-  	raw_signal_debug_constrain = constrain(raw_signal_debug_constrain, 1000, 2000);
-  	if (throttle_signal > throttle_trim + throttle_buffer) {
-  	  throttle_signal = map(throttle_signal, throttle_trim + throttle_buffer, 2000, 0, HBridgeDriver::maxPWM);
-  	  throttleMotor.setPWM(throttle_signal, HBridgeDriver::M1); 
-  	  Serial.print("IF+ Throttle: "); Serial.println(throttle_signal);
-  	  Serial.print("RAW: "); Serial.println(raw_signal_debug);
-  	}
-  	else if (throttle_signal < (throttle_trim - throttle_buffer)) {
-  	  throttle_signal = map(throttle_signal, 1000, throttle_trim - throttle_buffer, HBridgeDriver::maxPWM, 0);
-  	  //throttle_signal = -throttle_signal;
-  	  throttleMotor.setPWM(-throttle_signal, HBridgeDriver::M1);
-  	  Serial.print("IF- Throttle: "); Serial.println(throttle_signal);
-  	  Serial.print("RAW: "); Serial.println(raw_signal_debug);
-  	}
-  	else {
-  	  throttleMotor.setPWM(0, HBridgeDriver::M1);
+  	int16_t raw_signal_debug = throttle_signal_pwm;
+
+  	if (throttle_signal_pwm < pixhawk_min_pwm || throttle_signal_pwm > pixhawk_max_pwm) {
+  	  	throttle_signal_pwm = previous_valid_throttle_signal;
   	}
 
-  	//Serial.print("Prev throttle: "); Serial.println(previous_throttle_signal);
-	
-  	#if !PRINT_THROTTLE
-  	if (printSelectionIndex == PrintThrottle) {
-  	  static uint32_t throttle_read_timer = millis();
-  	  if (millis() - throttle_read_timer < 600) return;
-  	  throttle_read_timer = millis();
-  	  Serial.print("Raw throttle signal: "); Serial.println(raw_signal_debug);
-  	  Serial.print("Constrained throttle signal: "); Serial.println(raw_signal_debug_constrain);
-  	  Serial.print("Output signal: "); Serial.println(throttle_signal);
-  	  Serial.print("Index: "); Serial.println(control_index); Serial.print('\n');
-  	  control_index++;
+  	if (throttle_signal_pwm > pixhawk_trim_pwm + pixhawk_throttle_deadzone) {
+  	  	int output_pwm = map(throttle_signal_pwm, pixhawk_trim_pwm + pixhawk_throttle_deadzone, pixhawk_max_pwm, 0, HBridgeDriver::maxPWM);
+  	  	throttleMotor.setPWM(output_pwm, HBridgeDriver::M1); 
+  	} else if (throttle_signal_pwm < (pixhawk_trim_pwm - pixhawk_throttle_deadzone)) {
+  	  	int output_pwm = map(throttle_signal_pwm, pixhawk_min_pwm, pixhawk_trim_pwm - pixhawk_throttle_deadzone, HBridgeDriver::maxPWM, 0);
+  	  	throttleMotor.setPWM(-output_pwm, HBridgeDriver::M1);
+  	} else {
+  	  	throttleMotor.setPWM(0, HBridgeDriver::M1);
   	}
-  	#endif 
+
+  	previous_valid_throttle_signal = throttle_signal_pwm;
 }
 
 int ReadRudder() {
@@ -300,8 +273,7 @@ int ReadRudder() {
   	int pot_rudder_angle = map(pot_rudder_ADC, rudderADCMinThreshold, rudderADCMaxThreshold, rudderMinAngle, rudderMaxAngle);
   	pot_rudder_angle += rudderAngleOffset;
   	
-	#define PRINT_RUDDER_READINGS
-	
+	//#define PRINT_RUDDER_READINGS
 	#ifdef PRINT_RUDDER_READINGS
   	static uint32_t rudder_read_timer = millis();
   	if (millis() - rudder_read_timer < 1000) return pot_rudder_angle;
@@ -407,44 +379,6 @@ void MAVLinkToPixhawk(MAVLink_options option, float data) {
   	Serial3.write(buffer, length);
 }
 
-
-void ThrottleControlTest() {
-  	switch (throttleSelectionIndex) {
-  	  	case MOTOR_OFF:
-  	  	  	throttleMotor.setPWM(throttleSpeedTest, HBridgeDriver::M1);
-  	  	  	break;
-  	  	case MOTOR_FORWARD:
-  	  	  	throttleMotor.setPWM(throttleSpeedTest, HBridgeDriver::M1);
-  	  	  	break;
-  	  	case MOTOR_OFF_2:
-  	  	  	throttleMotor.setPWM(throttleSpeedTest, HBridgeDriver::M1);
-  	  	  	break;
-  	  	case MOTOR_BACK:
-  	  	  	throttleMotor.setPWM(-throttleSpeedTest, HBridgeDriver::M1);
-  	  	  	break;
-  	}
-}
-
-void PrintTestThrottleVariables(uint32_t time_interval = 1000) {
-  	static uint32_t print_timer = 0;
-  	if (millis() - print_timer < time_interval) return;
-  	print_timer = millis();
-
-  	Serial.print("Throttle selection index: "); Serial.println(throttleSelectionIndex);
-  	Serial.print("Throttle speed test: "); Serial.println(throttleSpeedTest);
-}
-
-void ProcessSerialInput(const char* buffer, size_t bufferLength) {
-	if (bufferLength < 2) return;
-	if (buffer[0] == 't') {
-		throttleSelectionIndex = atoi(buffer + 1);
-	} else if (buffer[0] == 's') {
-		throttleSpeedTest = atoi(buffer + 1);
-	} else if (buffer[0] == 'p') {
-		printSelectionIndex = atoi(buffer + 1);
-	}
-}
-
 void GetSerialInput() {
     constexpr int inputBufferLength = 256;
     static char inputBuffer[inputBufferLength];
@@ -467,7 +401,6 @@ void GetSerialInput() {
 		if (bufferIndex >= inputBufferLength) {
 			bufferIndex = 0;
 		}
-	}
-    
+	}  
 }
 
