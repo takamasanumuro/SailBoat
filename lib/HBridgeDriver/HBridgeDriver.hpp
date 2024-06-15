@@ -1,13 +1,13 @@
 #pragma once
 #include <Arduino.h>
 
-class UN178Driver {
+class HBridgeDriver {
 public:
-    UN178Driver(unsigned char INA1,
+    HBridgeDriver(unsigned char INA1,
                 unsigned char INB1,
                 unsigned char PWM1);
                 
-    UN178Driver(unsigned char INA1,
+    HBridgeDriver(unsigned char INA1,
                 unsigned char INB1,
                 unsigned char PWM1,
                 unsigned char INA2,

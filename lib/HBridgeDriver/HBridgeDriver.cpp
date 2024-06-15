@@ -1,6 +1,6 @@
-#include "UN178Driver.hpp"
+#include "HBridgeDriver.hpp"
 
-UN178Driver::UN178Driver(unsigned char INA1,
+HBridgeDriver::HBridgeDriver(unsigned char INA1,
                         unsigned char INB1,
                         unsigned char PWM1) { 
   _INA1 = INA1;
@@ -8,7 +8,7 @@ UN178Driver::UN178Driver(unsigned char INA1,
   _PWM1 = PWM1;
 }
 
-UN178Driver::UN178Driver(unsigned char INA1,
+HBridgeDriver::HBridgeDriver(unsigned char INA1,
                         unsigned char INB1,
                         unsigned char PWM1,
                         unsigned char INA2,
@@ -22,7 +22,7 @@ UN178Driver::UN178Driver(unsigned char INA1,
   _PWM2 = PWM2;
 }
 
-void UN178Driver::init() {
+void HBridgeDriver::init() {
   pinMode(_INA1,OUTPUT); digitalWrite(_INA1,LOW);
   pinMode(_INB1,OUTPUT); digitalWrite(_INB1,LOW);
   pinMode(_PWM1,OUTPUT); digitalWrite(_PWM1,LOW);
@@ -31,13 +31,13 @@ void UN178Driver::init() {
   pinMode(_PWM2,OUTPUT); digitalWrite(_PWM2,LOW);
 }
 
-void UN178Driver::init_channel_A() {
+void HBridgeDriver::init_channel_A() {
   pinMode(_INA1,OUTPUT); digitalWrite(_INA1,LOW);
   pinMode(_INB1,OUTPUT); digitalWrite(_INB1,LOW);
   pinMode(_PWM1,OUTPUT); digitalWrite(_PWM1,LOW);
 }
 
-void UN178Driver::setPWM(int pwm, UN178Channel channel) {
+void HBridgeDriver::setPWM(int pwm, UN178Channel channel) {
   unsigned char reverse = 0;
   if (pwm < 0) {
     pwm = -pwm;  // Make pwm a positive quantity
