@@ -8,12 +8,12 @@ enum MAVLink_options {
 };
 
 enum pixHawkChannels {
-  sailIndex = 0, 
-  rudderIndex = 1, 
-  throttleIndex = 2,
-  sailInputPWMPin = 13,
-  rudderInputPWMPin = 12,
-  throttleInputPWMPin = 11
+  sail = 0, 
+  rudder = 1, 
+  throttle = 2,
+  sailInputPWMPin = A8,
+  rudderInputPWMPin = A9,
+  throttleInputPWMPin = A10
 };
 
 typedef uint32_t timer;
@@ -26,7 +26,7 @@ static constexpr uint8_t pixhawk_comp_id = 1;
 int ReadRudder();
 void MoveRudder();
 void GetSerialInput();
-void GetAllPixhawkReadings();
+void CapturePixhawkPulses();
 int16_t GetPixhawkReading(pixHawkChannels pixhawk_channel);
 int16_t GetPixhawkReadingToAngle(pixHawkChannels pixhawk_channel);
 int16_t GetSailAngleFromReading(pixHawkChannels pixhawk_channel);

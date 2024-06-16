@@ -32,22 +32,6 @@ constexpr uint16_t pixhawkMaximumPWM = 1986;
 constexpr uint8_t pixHawkReadingPins[] = {sailInputPWMPin, rudderInputPWMPin, throttleInputPWMPin}; // Arduino pins that receive pixhawk output PWM to read with pulseIn() function
 constexpr uint8_t numberPixhawkPins = sizeof pixHawkReadingPins / sizeof pixHawkReadingPins[0]; // Get the number of elements in the array
 int16_t pixHawkReadingsPWM[numberPixhawkPins] = {1500}; // Array that stores the PWM control signal in microseconds coming from Pixhawk. Default initialized to middle servo trim of 1500us.
-enum PrintSelection {
-  PrintRudder = 0,
-  PrintSail = 1,
-  PrintThrottle = 2
-};
-uint8_t printSelectionIndex = PrintThrottle;
-
-enum throttleSelectionIndex {
-  MOTOR_OFF,
-  MOTOR_FORWARD,
-  MOTOR_OFF_2,
-  MOTOR_BACK
-};
-
-int throttleSpeedTest = 50;
-int throttleSelectionIndex = MOTOR_OFF;
 
 // Flags for conditional compilation
 #define PRINT_RUDDER 1
@@ -55,35 +39,6 @@ int throttleSelectionIndex = MOTOR_OFF;
 #define PRINT_THROTTLE 1
 //#define PRINT_RUDDER_READINGS
 //#define PRINT_SAIL_READINGS
-
-void TestSelectionIndex() {
-    static timer test_selection_timer = millis();
-    if (millis() - test_selection_timer < 1000) return;
-    test_selection_timer = millis();
-    
-    switch (printSelectionIndex) {
-        case PrintRudder:
-            Serial.println("RudderSelection");
-            break;
-        case PrintSail:
-            Serial.println("SailSelection");
-            break;
-        case PrintThrottle:
-            Serial.println("ThrottleSelection");
-            break;
-        default:
-            Serial.println("InvalidSelection");
-            break;
-    }
-}
-
-void printPixhawkArray() {
-    Serial.print("Input: ");
-    for (auto& pixHawkReading : pixHawkReadingsPWM) {
-        Serial.print(pixHawkReading); Serial.print("\t");
-    }
-    Serial.println();
-}
 
 int rudderAngleCommand = 0;
 int throttleSpeedCommand = 1500;
@@ -118,7 +73,7 @@ void setup() {
 	winchActuator.init_channel_A(); // Controls the winch actuator
     pinMode(rudderPinPotentiometer, INPUT); // Feedback for rudder PID
 	pinMode(sailPinPotentiometer, INPUT); // Feedback for sail PID
-    //for (auto& pixHawkReadingPin : pixHawkReadingPins) pinMode(pixHawkReadingPin, INPUT); // Input pins to read PWM control signals coming from Pixhawk
+    for (auto& pixHawkReadingPin : pixHawkReadingPins) pinMode(pixHawkReadingPin, INPUT); // Input pins to read PWM control signals coming from Pixhawk
 
 	FunctionSlot<const char*> parseActuatorCommandsSlot(ParseActuatorCommands);
 	serialInputSignal.attach(parseActuatorCommandsSlot);
@@ -126,16 +81,19 @@ void setup() {
 }
 
 void originalLoop() {
-	GetAllPixhawkReadings();
-	RudderControl(GetPixhawkReadingToAngle(rudderIndex));
-	SailControl(GetPixhawkReadingToAngle(sailIndex));
-	ThrottleControl(GetPixhawkReading(throttleIndex));
+	CapturePixhawkPulses();
+	RudderControl(GetPixhawkReadingToAngle(rudder));
+	SailControl(GetPixhawkReadingToAngle(sail));
+	ThrottleControl(GetPixhawkReading(throttle));
 	GetSerialInput();
 }
 
 void loop() {
-	//ReadRudder();
+	
 	GetSerialInput();
+	CapturePixhawkPulses();
+	rudderAngleCommand = GetPixhawkReadingToAngle(rudder);
+	throttleSpeedCommand = GetPixhawkReading(throttle);
 	RudderControl(rudderAngleCommand);
 	ThrottleControl(throttleSpeedCommand);
 }
@@ -227,18 +185,6 @@ void SailControl(int sail_angle_desired) {
   	if (sail_error > -3 && sail_error < 3) sail_output_pwm = 0; //Prevents excessive microadjustments from the actuator
   	winchActuator.setPWM(sail_output_pwm, HBridgeDriver::M1); 
 	
-  	#ifdef PRINT_SAIL
-  	if (printSelectionIndex == PrintSail) {
-  	  	static uint32_t sail_log_timer = millis(); // This section logs information periodically to the serial port
-  	  	if (millis() - sail_log_timer < 1500) return;
-  	  	sail_log_timer = millis();
-  	  	Serial.print("Sail ADC: "); Serial.println(sail_adc_reading);
-  	  	Serial.print("\nSail desired: "); Serial.println(sail_angle_desired);
-  	  	Serial.print("Sail present: "); Serial.println(sail_angle_present);
-  	  	Serial.print("Sail error: "); Serial.println(sail_error);
-  	  	Serial.print("Sail PWM: "); Serial.println(sail_output_pwm);
-  	}
-  	#endif
 }
 
 void ThrottleControl(int16_t throttle_signal_pwm) {
@@ -299,37 +245,31 @@ int ReadSail() {
   	return pot_sail_angle;
 }
 
-void GetAllPixhawkReadings() {
+void CapturePixhawkPulses() {
   	for (int i = 0; i < numberPixhawkPins; i++) {
 		pixHawkReadingsPWM[i] = pulseIn(pixHawkReadingPins[i], HIGH);
-  	}
-}
-
-int16_t GetPixhawkReading(pixHawkChannels pixhawk_channel) {
-  	for (int i = 0; i < numberPixhawkPins; i++) {
-		pixHawkReadingsPWM[i] = pulseIn(pixHawkReadingPins[i], HIGH);
-  	}
-  	return pixHawkReadingsPWM[pixhawk_channel];
+  	}	
 }
 
 int16_t GetPixhawkReadingToAngle(pixHawkChannels pixhawk_channel) {
-  	constexpr uint8_t safety_buffer = 10;
-  	int16_t angle_desired = 0;
+  	int16_t angle = 0;
   	switch(pixhawk_channel) { 
-  	  	case pixHawkChannels::rudderIndex:
-  	  	  	angle_desired = map(pixHawkReadingsPWM[pixhawk_channel], pixhawkMinimalPWM, pixhawkMaximumPWM, rudderMinAngle, rudderMaxAngle);
-  	  	  	angle_desired = constrain(angle_desired, rudderMinAngle + safety_buffer, rudderMaxAngle - safety_buffer);
+  	  	case pixHawkChannels::rudder:
+  	  	  	angle = map(pixHawkReadingsPWM[pixhawk_channel], pixhawkMinimalPWM, pixhawkMaximumPWM, rudderMinAngle, rudderMaxAngle);
   	  	  	break;
-  	  	case pixHawkChannels::sailIndex: // Mapping is inverted for the sail eg 1000us = 0 degrees = 3V; 2000us = 90 degrees = 1V. Sail should be able to go to zero degrees, so no safety buffer is needed..
-  	  	  	angle_desired = map(pixHawkReadingsPWM[pixhawk_channel], pixhawkMinimalPWM, pixhawkMaximumPWM, sailMinAngle, sailMaxAngle);
-  	  	  	angle_desired = constrain(angle_desired, sailMinAngle, sailMaxAngle - safety_buffer);
+  	  	case pixHawkChannels::sail: 
+  	  	  	angle = map(pixHawkReadingsPWM[pixhawk_channel], pixhawkMinimalPWM, pixhawkMaximumPWM, sailMinAngle, sailMaxAngle);
   	  	  	break;
   	  	default: // Other options are not PID controlled by angle, so they do not join here.
   	  	  	Serial.print("Error: Trying to get angle from non-angle controlled channel: "); Serial.println(pixhawk_channel);
   	  	  	while(1){} // Infinite loop to prevent the code from continuing
   	  	  	break;
   	}
-  	return angle_desired;
+  	return angle;
+}
+
+int16_t GetPixhawkReading(pixHawkChannels pixhawk_channel) {
+  	return pixHawkReadingsPWM[pixhawk_channel];
 }
 
 //envia dados para a pixhawk usando o protocolo MAVLINK
