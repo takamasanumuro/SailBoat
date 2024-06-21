@@ -1,19 +1,19 @@
 #pragma once
 #include "mavlink/mavlink.h"
 enum MAVLink_options {
-  rudder_pwm = 0,
-  rudder_angle = 1,
-  sail_pwm = 2,
-  sail_angle = 3,
+    rudder_pwm = 0,
+    rudder_angle = 1,
+    sail_pwm = 2,
+    sail_angle = 3,
 };
 
 enum pixHawkChannels {
-  sail = 0, 
-  rudder = 1, 
-  throttle = 2,
-  sailInputPWMPin = A8,
-  rudderInputPWMPin = A9,
-  throttleInputPWMPin = A10
+    sail = 0, 
+    rudder = 1, 
+    throttle = 2,
+    sailInputPWMPin = A11,
+    rudderInputPWMPin = A12,
+    throttleInputPWMPin = A13
 };
 
 typedef uint32_t timer;

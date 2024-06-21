@@ -3,19 +3,39 @@
 #include "HBridgeDriver.hpp"
 #include "main.hpp"
 #include "Callback.h"
+//#include "Servo.h"
 
-HBridgeDriver throttleMotor = HBridgeDriver(41, 40, 45);   // Digital/Digital/PWM order of pins
-HBridgeDriver rudderActuator = HBridgeDriver(43, 42, 44);  // Digital/Digital/PWM order of pins
-HBridgeDriver winchActuator = HBridgeDriver(39, 38, 46);   // Digital/Digital/PWM order of pins
+constexpr uint8_t pinWinchDirectionA = 39;
+constexpr uint8_t pinWinchDirectionB = 38;
+constexpr uint8_t pinWinchPWM = 46;
 
-constexpr uint8_t rudderPinPotentiometer = A6;
+constexpr uint8_t pinRudderDirectionA = 43;
+constexpr uint8_t pinRudderDirectionB = 42;
+constexpr uint8_t pinRudderPWM = 44;
+
+constexpr uint8_t pinThrottleDirectionA = 41;
+constexpr uint8_t pinThrottleDirectionB = 40;
+constexpr uint8_t pinThrottlePWM = 45;
+
+HBridgeDriver winchActuator = HBridgeDriver(pinWinchDirectionA, pinWinchDirectionB, pinWinchPWM);
+HBridgeDriver rudderActuator = HBridgeDriver(pinRudderDirectionA, pinRudderDirectionB, pinRudderPWM);  
+HBridgeDriver throttleMotor = HBridgeDriver(pinThrottleDirectionA, pinThrottleDirectionB, pinThrottlePWM);  
+
+//Servo bldcThrottleServo = Servo();
+
+constexpr uint8_t pinsPropulsionPower[] = {52, 53};
+constexpr uint8_t pinsSailGND[] = {22, 23};
+
+constexpr uint8_t pinRudderPotentiometerGND = A8;
+constexpr uint8_t pinRudderPotentiometerSignal = A9;
+constexpr uint8_t pinRudderPotentiometerPower = A10;
 constexpr int16_t rudderAngleOffset = 0;  // To align the rudder to the bow of the boat
 constexpr int16_t rudderADCMinThreshold = 308;  // Starboard -->
 constexpr int16_t rudderADCMaxThreshold = 661;  // Port <--
 constexpr float rudderMinAngle = -47.69; // Starboard
 constexpr float rudderMaxAngle = 53.64;  // Port
 
-constexpr uint8_t sailPinPotentiometer = A7;
+constexpr uint8_t pinSailPotentiometerSignal = A7;
 constexpr int16_t sailAngleOffset = 0;  // To align the rudder to the bow of the boat
 constexpr int16_t sailADCMinThreshold = 400; // 2V that corresponds to 90 sail degree
 constexpr int16_t sailADCMaxThreshold = 800; // 4V that corresponds to zero sail degree
@@ -40,6 +60,7 @@ int16_t pixHawkReadingsPWM[numberPixhawkPins] = {1500}; // Array that stores the
 //#define PRINT_RUDDER_READINGS
 //#define PRINT_SAIL_READINGS
 
+Signal<const char*> serialInputSignal;
 int rudderAngleCommand = 0;
 int throttleSpeedCommand = 1500;
 
@@ -61,31 +82,35 @@ void ParseActuatorCommands(const char* message) {
 	}
 }
 
-Signal<const char*> serialInputSignal;
-
 void setup() {
-    Serial.begin(115200);  // For PC communications
+    Serial.begin(9600);  // For PC communications
     Serial.print("FBoat initializing\n");
 	delay(1000);
 
-    throttleMotor.init_channel_A(); // Controls the throttle motor
+    pinMode(pinRudderPotentiometerGND, OUTPUT); digitalWrite(pinRudderPotentiometerGND, LOW);
+	pinMode(pinRudderPotentiometerSignal, INPUT); // Feedback for rudder PID
+	pinMode(pinRudderPotentiometerPower, OUTPUT); digitalWrite(pinRudderPotentiometerPower, HIGH);
+	
+	pinMode(pinSailPotentiometerSignal, INPUT); // Feedback for sail PID
+	for (auto& pin : pinsPropulsionPower) {
+		pinMode(pin, OUTPUT); digitalWrite(pin, HIGH);
+	}
+	
+	for (auto &pin : pinsSailGND) {
+		pinMode(pin, OUTPUT); digitalWrite(pin, LOW);
+	}
+	
+	for (auto& pin : pixHawkReadingPins) pinMode(pin, INPUT); // Input pins to read PWM control signals coming from Pixhawk
+
 	rudderActuator.init_channel_A(); // Controls the rudder actuator
 	winchActuator.init_channel_A(); // Controls the winch actuator
-    pinMode(rudderPinPotentiometer, INPUT); // Feedback for rudder PID
-	pinMode(sailPinPotentiometer, INPUT); // Feedback for sail PID
-    for (auto& pixHawkReadingPin : pixHawkReadingPins) pinMode(pixHawkReadingPin, INPUT); // Input pins to read PWM control signals coming from Pixhawk
+    throttleMotor.init_channel_A(); // Controls the throttle motor
+
+	//bldcThrottleServo.attach(pinThrottlePWM, pixhawkMinimalPWM, pixhawkMaximumPWM);
 
 	FunctionSlot<const char*> parseActuatorCommandsSlot(ParseActuatorCommands);
 	serialInputSignal.attach(parseActuatorCommandsSlot);
 
-}
-
-void originalLoop() {
-	CapturePixhawkPulses();
-	RudderControl(GetPixhawkReadingToAngle(rudder));
-	SailControl(GetPixhawkReadingToAngle(sail));
-	ThrottleControl(GetPixhawkReading(throttle));
-	GetSerialInput();
 }
 
 void loop() {
@@ -171,7 +196,7 @@ void RudderControl(int rudder_angle_desired) {
 }
 
 void SailControl(int sail_angle_desired) {
-  	int sail_adc_reading = analogRead(sailPinPotentiometer);
+  	int sail_adc_reading = analogRead(pinSailPotentiometerSignal);
   	if ((sail_adc_reading < 100 || sail_adc_reading > 900)) { // If the potentiometer is close to the end of its range, enters safety mode
   	  	Serial.println("Sail Potentiometer critical!");
   	  	winchActuator.setPWM(0, HBridgeDriver::M1);
@@ -187,35 +212,55 @@ void SailControl(int sail_angle_desired) {
 	
 }
 
-void ThrottleControl(int16_t throttle_signal_pwm) {
-  	constexpr int16_t pixhawk_min_pwm = 975;
-  	constexpr int16_t pixhawk_trim_pwm = 1500;
-  	constexpr int16_t pixhawk_max_pwm = 2000;
-  	constexpr int16_t pixhawk_throttle_deadzone = 200;
-
-  	static int16_t previous_valid_throttle_signal = 1500;
-	
-  	int16_t raw_signal_debug = throttle_signal_pwm;
-
-  	if (throttle_signal_pwm < pixhawk_min_pwm || throttle_signal_pwm > pixhawk_max_pwm) {
-  	  	throttle_signal_pwm = previous_valid_throttle_signal;
-  	}
-
-  	if (throttle_signal_pwm > pixhawk_trim_pwm + pixhawk_throttle_deadzone) {
-  	  	int output_pwm = map(throttle_signal_pwm, pixhawk_trim_pwm + pixhawk_throttle_deadzone, pixhawk_max_pwm, 0, HBridgeDriver::maxPWM);
-  	  	throttleMotor.setPWM(output_pwm, HBridgeDriver::M1); 
-  	} else if (throttle_signal_pwm < (pixhawk_trim_pwm - pixhawk_throttle_deadzone)) {
-  	  	int output_pwm = map(throttle_signal_pwm, pixhawk_min_pwm, pixhawk_trim_pwm - pixhawk_throttle_deadzone, HBridgeDriver::maxPWM, 0);
-  	  	throttleMotor.setPWM(-output_pwm, HBridgeDriver::M1);
+// This function is used to control the throttle motor using an H-Bridge motor driver.
+// Therefore a mapping is done from the Pixhawk PWM signal (5-10% duty cycle) to the H-Bridge PWM signal (0-98% duty cycle) 
+// This is required when using generic DC motors that do not have native PWM control, but that can be controlled using a H-Bridge to change direction and speed.
+void ThrottleControlHBridge(int16_t pixhawk_throttle_pwm, int16_t pixhawk_min_pwm, int16_t pixhawk_max_pwm, int16_t trim_pwm, int16_t dead_zone_pwm) {
+	int h_bridge_throttle_pwm;
+	if (pixhawk_throttle_pwm > trim_pwm + dead_zone_pwm) {
+  	  	h_bridge_throttle_pwm = map(pixhawk_throttle_pwm, trim_pwm + dead_zone_pwm, pixhawk_max_pwm, 0, HBridgeDriver::maxPWM);
+  	  	throttleMotor.setPWM(h_bridge_throttle_pwm, HBridgeDriver::M1); 
+  	} else if (pixhawk_throttle_pwm < (trim_pwm - dead_zone_pwm)) {
+  	  	h_bridge_throttle_pwm = map(pixhawk_throttle_pwm, pixhawk_min_pwm, trim_pwm - dead_zone_pwm, HBridgeDriver::maxPWM, 0);
+  	  	throttleMotor.setPWM(-h_bridge_throttle_pwm, HBridgeDriver::M1);
   	} else {
   	  	throttleMotor.setPWM(0, HBridgeDriver::M1);
   	}
+}
 
-  	previous_valid_throttle_signal = throttle_signal_pwm;
+// This function is used to control the throttle motor using a BLDC motor driver
+// Therefore it just does a signal passthrough from the Pixhawk as the autopilot already works with BLDC motors by default
+void ThrottleControlBLDC(int16_t pixhawk_throttle_pwm) {
+	//bldcThrottleServo.writeMicroseconds(pixhawk_throttle_pwm);	
+}
+
+void ThrottleControl(int16_t pixhawk_throttle_pwm) {
+  	constexpr int16_t pixhawk_min_pwm = 975;
+  	constexpr int16_t pixhawk_max_pwm = 2000;
+  	constexpr int16_t trim_pwm = 1500;
+  	constexpr int16_t dead_zone_pwm = 200;
+
+  	static int16_t previous_valid_throttle_signal = 1500;
+
+  	if (pixhawk_throttle_pwm < pixhawk_min_pwm || pixhawk_throttle_pwm > pixhawk_max_pwm) {
+  	  	pixhawk_throttle_pwm = previous_valid_throttle_signal;
+  	}
+
+	//Choose a control method for the throttle motor
+  	ThrottleControlBLDC(pixhawk_throttle_pwm); 
+	//ThrottleControlHBridge(pixhawk_throttle_pwm, pixhawk_min_pwm, pixhawk_max_pwm, trim_pwm, dead_zone_pwm);
+
+	static timer log_timer = millis();
+	if (millis() - log_timer > 1000) {
+		log_timer = millis();
+		Serial.print("Throttle PWM: "); Serial.println(pixhawk_throttle_pwm);
+	}
+
+  	previous_valid_throttle_signal = pixhawk_throttle_pwm;
 }
 
 int ReadRudder() {
-  	int pot_rudder_ADC = analogRead(rudderPinPotentiometer);
+  	int pot_rudder_ADC = analogRead(pinRudderPotentiometerSignal);
   	int pot_rudder_angle = map(pot_rudder_ADC, rudderADCMinThreshold, rudderADCMaxThreshold, rudderMinAngle, rudderMaxAngle);
   	pot_rudder_angle += rudderAngleOffset;
   	
@@ -232,7 +277,7 @@ int ReadRudder() {
 
 //2V correspondendo a vela em 90 graus/ 4V correspondendo a vela em 0 graus
 int ReadSail() {
-  	int pot_sail_ADC = analogRead(sailPinPotentiometer); //2V aqui        //4V Aqui            2V-->90 graus  4V-->10 graus
+  	int pot_sail_ADC = analogRead(pinSailPotentiometerSignal); //2V aqui        //4V Aqui            2V-->90 graus  4V-->10 graus
   	int pot_sail_angle = map(pot_sail_ADC, sailADCMinThreshold, sailADCMaxThreshold, sailMaxAngle, sailMinAngle);
   	pot_sail_angle += sailAngleOffset;
   	#ifdef PRINT_SAIL_READINGS
@@ -253,7 +298,7 @@ void CapturePixhawkPulses() {
 
 int16_t GetPixhawkReadingToAngle(pixHawkChannels pixhawk_channel) {
   	int16_t angle = 0;
-  	switch(pixhawk_channel) { 
+  	switch (pixhawk_channel) { 
   	  	case pixHawkChannels::rudder:
   	  	  	angle = map(pixHawkReadingsPWM[pixhawk_channel], pixhawkMinimalPWM, pixhawkMaximumPWM, rudderMinAngle, rudderMaxAngle);
   	  	  	break;
