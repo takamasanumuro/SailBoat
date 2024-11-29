@@ -42,8 +42,8 @@ constexpr int16_t sailADCMaxThreshold = 800; // 4V that corresponds to zero sail
 constexpr int16_t sailMinAngle = 0;
 constexpr int16_t sailMaxAngle = 90;
 
-constexpr float rudder_proportional_constant = 5.0f;
-constexpr float rudder_integral_constant = 8.0f;
+constexpr float rudder_proportional_constant = 20.0f;
+constexpr float rudder_integral_constant = 4.0f;
 constexpr float sail_proportional_constant = 8.0f;
 constexpr float sail_integral_constant = 15.0f;
 
