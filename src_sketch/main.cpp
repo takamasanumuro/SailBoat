@@ -1,8 +1,9 @@
 #include <Arduino.h>
+#include "analog_voltage_generator.hpp"
 
 #ifdef SKETCH_MODE
-    #define SKETCH_VERSION "1.0.0"
-    #define SKETCH_NAME "SailBoat Sketch Environment"
+    #define SKETCH_VERSION "1.1.0"
+    #define SKETCH_NAME "Analog Voltage Generator"
 #endif
 
 void setup() {
@@ -10,26 +11,45 @@ void setup() {
     delay(1000);
     
     #ifdef SKETCH_MODE
-        Serial.println("===================================");
+        Serial.println("====================================");
         Serial.print("Starting: "); Serial.println(SKETCH_NAME);
         Serial.print("Version: "); Serial.println(SKETCH_VERSION);
         Serial.println("Environment: SKETCH");
-        Serial.println("===================================");
+        Serial.println("====================================");
     #endif
     
-    Serial.println("Sketch environment ready for testing!");
-    Serial.println("Add your experimental code here...");
+    Serial.println("   Analog Voltage Generator Sketch");
+    Serial.println("====================================");
+    
+    // Configure voltage generator
+    AnalogVoltageGenerator::VoltageConfig config;
+    config.min_voltage_mv = 800.0f;   // 0.8V minimum
+    config.max_voltage_mv = 4000.0f;  // 4.0V maximum
+    config.pwm_pin = 9;               // PWM output pin
+    config.pwm_frequency_hz = 490;    // Arduino default PWM frequency
+    config.pwm_resolution_bits = 8;   // 8-bit resolution (0-255)
+    
+    // Initialize the voltage generator
+    if (!AnalogVoltageGenerator::generator.init(config)) {
+        Serial.println("FATAL: Failed to initialize voltage generator!");
+        while (1) {
+            delay(1000);
+        }
+    }
+    
+    // Initialize command interface
+    AnalogVoltageGenerator::CommandInterface::init();
+    Serial.println();
+    Serial.println("Ready! Use commands to control voltage output.");
+    Serial.println("Output will be on pin 9 (requires low-pass filter).");
+    Serial.println("Example: 'set 50' for 50% output (2.4V)");
+    Serial.println();
 }
 
 void loop() {
-    static uint32_t heartbeat_timer = 0;
+    // Process serial commands
+    AnalogVoltageGenerator::CommandInterface::processSerialInput();
     
-    if (millis() - heartbeat_timer > 5000) {
-        heartbeat_timer = millis();
-        Serial.print("Sketch running... uptime: ");
-        Serial.print(millis() / 1000);
-        Serial.println(" seconds");
-    }
-    
-    delay(100);
+    // Add any other periodic tasks here
+    delay(10);  // Small delay to prevent overwhelming the serial buffer
 }

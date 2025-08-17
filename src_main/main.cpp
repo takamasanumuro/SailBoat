@@ -48,6 +48,7 @@ void setup() {
     
     // Initialize logging system first
     Logger::init();
+	Logger::setLogLevel(Logger::DEBUG);
     
     #ifdef ENVIRONMENT_MAIN
         Logger::logSystemStart(Config::System::NAME, Config::System::VERSION);
@@ -79,6 +80,12 @@ void loop() {
 	throttleSpeedCommand = Actuators::getPixhawkReading(throttle);
 	PIDController::controlRudder(rudderAngleCommand);
 	PIDController::controlThrottle(throttleSpeedCommand);
+
+	static unsigned long debug_print_timer = millis();
+	if (millis() - debug_print_timer > 1000) {
+		Logger::log(Logger::INFO, "Loop running");
+		debug_print_timer = millis();
+	}
 }
 
 // MAVLink communication with Pixhawk

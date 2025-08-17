@@ -6,7 +6,7 @@
 extern HBridgeDriver winchActuator;
 extern HBridgeDriver rudderActuator;
 extern HBridgeDriver throttleMotor;
-extern const uint8_t pixHawkReadingPins[];
+// Removed extern declaration - using direct config access instead
 extern int16_t pixHawkReadingsPWM[];
 
 namespace Actuators {
@@ -43,9 +43,10 @@ namespace Actuators {
     }
     
     void initializePixhawkPins() {
-        for (auto& pin : pixHawkReadingPins) {
-            pinMode(pin, INPUT);
-        }
+        // Use direct config values instead of extern array
+        pinMode(Config::Pins::PixhawkInput::SAIL, INPUT);
+        pinMode(Config::Pins::PixhawkInput::RUDDER, INPUT);
+        pinMode(Config::Pins::PixhawkInput::THROTTLE, INPUT);
     }
     
     void initializeMotorDrivers() {
@@ -117,9 +118,10 @@ namespace Actuators {
     }
     
     void capturePixhawkPulses() {
-        for (int i = 0; i < Config::Buffers::PIXHAWK_CHANNELS; i++) {
-            pixHawkReadingsPWM[i] = pulseIn(pixHawkReadingPins[i], HIGH);
-        }
+        // Use direct config values instead of extern array
+        pixHawkReadingsPWM[0] = pulseIn(Config::Pins::PixhawkInput::SAIL, HIGH);
+        pixHawkReadingsPWM[1] = pulseIn(Config::Pins::PixhawkInput::RUDDER, HIGH);
+        pixHawkReadingsPWM[2] = pulseIn(Config::Pins::PixhawkInput::THROTTLE, HIGH);
     }
     
     int16_t getPixhawkReading(uint8_t channel) {
