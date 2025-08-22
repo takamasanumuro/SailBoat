@@ -25,7 +25,7 @@ void setup() {
     AnalogVoltageGenerator::VoltageConfig config;
     config.min_voltage_mv = 800.0f;   // 0.8V minimum
     config.max_voltage_mv = 4000.0f;  // 4.0V maximum
-    config.pwm_pin = 9;               // PWM output pin
+    config.pwm_pin = 2;               // PWM output pin
     config.pwm_frequency_hz = 490;    // Arduino default PWM frequency
     config.pwm_resolution_bits = 8;   // 8-bit resolution (0-255)
     
@@ -41,7 +41,7 @@ void setup() {
     AnalogVoltageGenerator::CommandInterface::init();
     Serial.println();
     Serial.println("Ready! Use commands to control voltage output.");
-    Serial.println("Output will be on pin 9 (requires low-pass filter).");
+    Serial.println("Output will be on pin " + String(config.pwm_pin));
     Serial.println("Example: 'set 50' for 50% output (2.4V)");
     Serial.println();
 }
