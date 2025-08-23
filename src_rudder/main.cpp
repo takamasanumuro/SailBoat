@@ -1,52 +1,151 @@
 #include <Arduino.h>
-#include "rudder_controller.hpp"
+#include "HBridgeDriver_v2.hpp"
 
 #ifdef RUDDER_TEST_MODE
-    #define TEST_VERSION "1.0.0"
-    #define TEST_NAME "Rudder H-Bridge Tester"
+    #define TEST_VERSION "2.0.0"
+    #define TEST_NAME "Direct H-Bridge Controller"
 #endif
+
+// Global H-bridge driver instance
+HBridgeDriverV2 rudder_hbridge;
+
+// Simple utility functions
+namespace RudderUtils {
+    int pwmInputToPercentage(int pwm_input) {
+        if (pwm_input < 1000 || pwm_input > 2000) return 0;
+        return (pwm_input - 1500) / 5;
+    }
+    
+    int percentageToPWMInput(int percentage) {
+        if (percentage < -100 || percentage > 100) return 1500;
+        return 1500 + (percentage * 5);
+    }
+}
+
+// Command interface
+namespace Commands {
+    static char input_buffer[32];
+    static int buffer_index = 0;
+    
+    void parseCommand(const char* cmd); // Forward declaration
+    
+    void init() {
+        Serial.println("=======================================");
+        Serial.println("     Direct H-Bridge Rudder Control");
+        Serial.println("=======================================");
+        Serial.println("Commands: p <-100-100>, pwm <1000-2000>, stop, help");
+        Serial.print("> ");
+    }
+    
+    void processInput() {
+        while (Serial.available()) {
+            char c = Serial.read();
+            if (c == '\r') continue;
+            
+            if (c == '\n') {
+                input_buffer[buffer_index] = '\0';
+                buffer_index = 0;
+                if (strlen(input_buffer) > 0) {
+                    parseCommand(input_buffer);
+                }
+                Serial.print("> ");
+            } else if (buffer_index < (int)sizeof(input_buffer) - 1) {
+                input_buffer[buffer_index++] = c;
+                Serial.print(c);
+            }
+        }
+    }
+    
+    void parseCommand(const char* cmd) {
+        Serial.println();
+        
+        char cmd_copy[32];
+        strncpy(cmd_copy, cmd, sizeof(cmd_copy) - 1);
+        cmd_copy[sizeof(cmd_copy) - 1] = '\0';
+        
+        char* command = strtok(cmd_copy, " ");
+        char* arg = strtok(NULL, " ");
+        
+        if (command == NULL) return;
+        
+        if (strcmp(command, "p") == 0 && arg != NULL) {
+            int percentage = atoi(arg);
+            auto result = rudder_hbridge.setPercentage((float)percentage, HBridgeDriverV2::Channel::M1);
+            if (result == HBridgeDriverV2::ErrorCode::NONE) {
+                Serial.print("Set to "); Serial.print(percentage); Serial.println("%");
+            } else {
+                Serial.println("Error setting percentage");
+            }
+        }
+        else if (strcmp(command, "pwm") == 0 && arg != NULL) {
+            int pwm_input = atoi(arg);
+            int percentage = RudderUtils::pwmInputToPercentage(pwm_input);
+            auto result = rudder_hbridge.setPercentage((float)percentage, HBridgeDriverV2::Channel::M1);
+            if (result == HBridgeDriverV2::ErrorCode::NONE) {
+                Serial.print("Set PWM "); Serial.print(pwm_input); Serial.print(" ("); 
+                Serial.print(percentage); Serial.println("%)");
+            } else {
+                Serial.println("Error setting PWM input");
+            }
+        }
+        else if (strcmp(command, "stop") == 0) {
+            rudder_hbridge.stop(HBridgeDriverV2::Channel::M1);
+            Serial.println("Stopped");
+        }
+        else if (strcmp(command, "status") == 0) {
+            int16_t pwm = rudder_hbridge.getCurrentPWM(HBridgeDriverV2::Channel::M1);
+            float pct = rudder_hbridge.getCurrentPercentage(HBridgeDriverV2::Channel::M1);
+            Serial.print("PWM: "); Serial.print(pwm);
+            Serial.print(", Percentage: "); Serial.print(pct); Serial.println("%");
+        }
+        else if (strcmp(command, "help") == 0) {
+            Serial.println("Commands:");
+            Serial.println("p <-100-100>   - Set percentage");
+            Serial.println("pwm <1000-2000> - Set PWM input");
+            Serial.println("stop           - Stop motor");
+            Serial.println("status         - Show status");
+        }
+        else {
+            Serial.println("Unknown command. Type 'help'.");
+        }
+    }
+}
 
 void setup() {
     Serial.begin(9600);
     delay(1000);
     
-    #ifdef RUDDER_TEST_MODE
-        Serial.println("===================================");
-        Serial.print("Starting: "); Serial.println(TEST_NAME);
-        Serial.print("Version: "); Serial.println(TEST_VERSION);
-        Serial.println("Environment: RUDDER TEST");
-        Serial.println("===================================");
-    #endif
+    Serial.println("Initializing H-bridge...");
     
-    Serial.println("Initializing rudder controller...");
+    // Configure H-bridge using explicit member initialization
+    HBridgeDriverV2::Config rudder_cfg;
+    rudder_cfg.ina_pin = 43;
+    rudder_cfg.inb_pin = 42;
+    rudder_cfg.pwm_pin = 44;
+    rudder_cfg.max_pwm = 240;
     
-    // Configure rudder controller
-    RudderController::Config config;
-    config.direction_pin_a = 43;  // INA pin - adjust as needed
-    config.direction_pin_b = 42;  // INB pin - adjust as needed  
-    config.pwm_pin = 44;           // PWM pin - adjust as needed
-    config.max_pwm = 240;         // Max PWM (matches HBridgeDriver)
-    
-    // Initialize controller
-    if (!RudderController::rudder.init(config)) {
-        Serial.println("FATAL: Failed to initialize rudder controller!");
-        while (1) {
-            delay(1000);
-        }
+    auto config_result = rudder_hbridge.setChannelConfig(HBridgeDriverV2::Channel::M1, rudder_cfg);
+    if (config_result != HBridgeDriverV2::ErrorCode::NONE) {
+        Serial.println("FATAL: Configuration failed");
+        Serial.println(rudder_hbridge.getErrorString(config_result));
+        while (1) delay(1000);
     }
     
-    // Initialize command interface
-    RudderController::Commands::init();
+    auto init_result = rudder_hbridge.init();
+    if (init_result != HBridgeDriverV2::ErrorCode::NONE) {
+        Serial.println("FATAL: Initialization failed");
+        Serial.println(rudder_hbridge.getErrorString(init_result));
+        while (1) delay(1000);
+    }
+
+    pinMode(41, OUTPUT); digitalWrite(41, HIGH);
+    pinMode(40, OUTPUT); digitalWrite(40, LOW);
     
-    Serial.println();
-    Serial.println("Rudder controller ready!");
-    Serial.println("Try: 'p 50' for 50% starboard or 'pwm 1750' for starboard");
-    Serial.println();
+    Commands::init();
+    Serial.println("Ready!");
 }
 
 void loop() {
-    // Process serial commands
-    RudderController::Commands::processInput();
-    
-    delay(10);  // Small delay
+    Commands::processInput();
+    delay(10);
 }
