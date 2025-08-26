@@ -47,7 +47,7 @@ public:
         uint8_t inb_pin;
         uint8_t pwm_pin;
         int16_t max_pwm = 240;          // Maximum PWM value (94% duty cycle)
-        int16_t min_pwm = 0;            // Minimum PWM value
+        int16_t min_pwm = 0;            // Minimum PWM value (deadband threshold)
     };
     
 private:
@@ -125,7 +125,7 @@ public:
     static constexpr float MIN_PERCENTAGE = -100.0f;
     
     // Static utility functions
-    static int16_t percentageToPWM(float percentage, int16_t max_pwm = DEFAULT_MAX_PWM);
+    static int16_t percentageToPWM(float percentage, int16_t max_pwm = DEFAULT_MAX_PWM, int16_t min_pwm = 0);
     static float pwmToPercentage(int16_t pwm, int16_t max_pwm = DEFAULT_MAX_PWM);
     static bool isValidPercentage(float percentage);
 };

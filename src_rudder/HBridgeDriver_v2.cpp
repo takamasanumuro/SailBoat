@@ -212,24 +212,30 @@ ErrorCode HBridgeDriverV2::setPercentage(float percentage, Channel channel) {
     }
     
     int16_t max_pwm = DEFAULT_MAX_PWM;
+    int16_t min_pwm = 0;
     
-    // Get appropriate max_pwm for the channel
+    // Get appropriate max_pwm and min_pwm for the channel
     if (channel == Channel::M1 && m1_enabled) {
         max_pwm = m1_config.max_pwm;
+        min_pwm = m1_config.min_pwm;
     } else if (channel == Channel::M2 && m2_enabled) {
         max_pwm = m2_config.max_pwm;
+        min_pwm = m2_config.min_pwm;
     } else if (channel == Channel::BOTH) {
-        // Use the minimum max_pwm of enabled channels
+        // Use the minimum max_pwm and maximum min_pwm of enabled channels
         if (m1_enabled && m2_enabled) {
             max_pwm = min(m1_config.max_pwm, m2_config.max_pwm);
+            min_pwm = max(m1_config.min_pwm, m2_config.min_pwm);
         } else if (m1_enabled) {
             max_pwm = m1_config.max_pwm;
+            min_pwm = m1_config.min_pwm;
         } else if (m2_enabled) {
             max_pwm = m2_config.max_pwm;
+            min_pwm = m2_config.min_pwm;
         }
     }
     
-    int16_t pwm = percentageToPWM(percentage, max_pwm);
+    int16_t pwm = percentageToPWM(percentage, max_pwm, min_pwm);
     return setPWM(pwm, channel);
 }
 
@@ -537,12 +543,21 @@ void HBridgeDriverV2::setError(ErrorCode error) {
 }
 
 // Static utility functions
-int16_t HBridgeDriverV2::percentageToPWM(float percentage, int16_t max_pwm) {
+int16_t HBridgeDriverV2::percentageToPWM(float percentage, int16_t max_pwm, int16_t min_pwm) {
     if (!isValidPercentage(percentage)) {
         return 0;
     }
     
-    return (int16_t)(percentage * max_pwm / 100.0f);
+    if (percentage == 0.0f) {
+        return 0; // Zero percentage always means stop
+    }
+    
+    // Map percentage to min_pwm-max_pwm range, preserving sign
+    float abs_percentage = abs(percentage);
+    int16_t effective_range = max_pwm - min_pwm;
+    int16_t mapped_pwm = min_pwm + (int16_t)(abs_percentage * effective_range / 100.0f);
+    
+    return (percentage < 0) ? -mapped_pwm : mapped_pwm;
 }
 
 float HBridgeDriverV2::pwmToPercentage(int16_t pwm, int16_t max_pwm) {

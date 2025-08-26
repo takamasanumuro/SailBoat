@@ -49,6 +49,11 @@ namespace Commands {
                     parseCommand(input_buffer);
                 }
                 Serial.print("> ");
+            } else if (c == '\b' || c == '\x7f') { // Backspace or Delete
+                if (buffer_index > 0) {
+                    buffer_index--;
+                    Serial.print("\b \b"); // Move cursor back, print space, move back again
+                }
             } else if (buffer_index < (int)sizeof(input_buffer) - 1) {
                 input_buffer[buffer_index++] = c;
                 Serial.print(c);
@@ -119,10 +124,11 @@ void setup() {
     
     // Configure H-bridge using explicit member initialization
     HBridgeDriverV2::Config rudder_cfg;
-    rudder_cfg.ina_pin = 43;
-    rudder_cfg.inb_pin = 42;
-    rudder_cfg.pwm_pin = 44;
+    rudder_cfg.pwm_pin = 10;
+    rudder_cfg.ina_pin = 9;
+    rudder_cfg.inb_pin = 8;
     rudder_cfg.max_pwm = 240;
+    rudder_cfg.min_pwm = 60;  // 25% of 240 = 60 (configurable deadband)
     
     auto config_result = rudder_hbridge.setChannelConfig(HBridgeDriverV2::Channel::M1, rudder_cfg);
     if (config_result != HBridgeDriverV2::ErrorCode::NONE) {
@@ -138,8 +144,8 @@ void setup() {
         while (1) delay(1000);
     }
 
-    pinMode(41, OUTPUT); digitalWrite(41, HIGH);
-    pinMode(40, OUTPUT); digitalWrite(40, LOW);
+    pinMode(11, OUTPUT); digitalWrite(11, LOW);
+    pinMode(12, OUTPUT); digitalWrite(12, HIGH);
     
     Commands::init();
     Serial.println("Ready!");
