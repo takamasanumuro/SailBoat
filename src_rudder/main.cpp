@@ -26,6 +26,9 @@ namespace RudderUtils {
 namespace Commands {
     static char input_buffer[32];
     static int buffer_index = 0;
+    static bool analog_monitoring_enabled = false;
+    static unsigned long last_analog_print = 0;
+    static const unsigned long ANALOG_PRINT_INTERVAL = 1000; // 1 second
     
     void parseCommand(const char* cmd); // Forward declaration
     
@@ -103,16 +106,51 @@ namespace Commands {
             Serial.print("PWM: "); Serial.print(pwm);
             Serial.print(", Percentage: "); Serial.print(pct); Serial.println("%");
         }
+        else if (strcmp(command, "analog") == 0) {
+            if (arg != NULL) {
+                if (strcmp(arg, "on") == 0) {
+                    analog_monitoring_enabled = true;
+                    Serial.println("Analog monitoring enabled");
+                } else if (strcmp(arg, "off") == 0) {
+                    analog_monitoring_enabled = false;
+                    Serial.println("Analog monitoring disabled");
+                } else {
+                    Serial.println("Usage: analog <on|off>");
+                }
+            } else {
+                // Single analog read when no argument provided
+                int analog_value = analogRead(A9);
+                float voltage = analog_value * 5.0f / 1023.0f;
+                Serial.print("A9: "); Serial.print(analog_value);
+                Serial.print(" ("); Serial.print(voltage, 2); Serial.println("V)");
+            }
+        }
         else if (strcmp(command, "help") == 0) {
             Serial.println("Commands:");
             Serial.println("p <-100-100>   - Set percentage");
             Serial.println("pwm <1000-2000> - Set PWM input");
             Serial.println("stop           - Stop motor");
             Serial.println("status         - Show status");
+            Serial.println("analog         - Read A9 analog value once");
+            Serial.println("analog on      - Enable continuous analog monitoring");
+            Serial.println("analog off     - Disable continuous analog monitoring");
         }
         else {
             Serial.println("Unknown command. Type 'help'.");
         }
+    }
+    
+    void updateAnalogMonitoring() {
+        if (!analog_monitoring_enabled) return;
+        
+        unsigned long current_time = millis();
+        if (current_time - last_analog_print < ANALOG_PRINT_INTERVAL) return;
+        
+        int analog_value = analogRead(A9);
+        float voltage = analog_value * 5.0f / 1023.0f;
+        Serial.print("A9: "); Serial.print(analog_value);
+        Serial.print(" ("); Serial.print(voltage, 2); Serial.println("V)");
+        last_analog_print = current_time;
     }
 }
 
@@ -125,8 +163,8 @@ void setup() {
     // Configure H-bridge using explicit member initialization
     HBridgeDriverV2::Config rudder_cfg;
     rudder_cfg.pwm_pin = 10;
-    rudder_cfg.ina_pin = 9;
-    rudder_cfg.inb_pin = 8;
+    rudder_cfg.inb_pin = 9;
+    rudder_cfg.ina_pin = 8;
     rudder_cfg.max_pwm = 240;
     rudder_cfg.min_pwm = 60;  // 25% of 240 = 60 (configurable deadband)
     
@@ -147,11 +185,17 @@ void setup() {
     pinMode(11, OUTPUT); digitalWrite(11, LOW);
     pinMode(12, OUTPUT); digitalWrite(12, HIGH);
     
+    // Configure additional pins
+    pinMode(A8, OUTPUT); digitalWrite(A8, LOW);   // A8 as digital LOW
+    pinMode(A10, OUTPUT); digitalWrite(A10, HIGH); // A10 as digital HIGH
+    pinMode(A9, INPUT);                           // A9 for analog monitoring
+    
     Commands::init();
     Serial.println("Ready!");
 }
 
 void loop() {
     Commands::processInput();
+    Commands::updateAnalogMonitoring();
     delay(10);
 }
