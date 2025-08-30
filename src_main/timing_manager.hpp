@@ -39,12 +39,8 @@ namespace TimingManager {
     
     // Timer IDs for system timers
     enum SystemTimerID {
-        PID_LOG_TIMER = 0,
-        MAVLINK_PUBLISH_TIMER,
-        THROTTLE_LOG_TIMER,
+        MOTOR_LOG_TIMER,
         RUDDER_READ_TIMER,
-        SAIL_READ_TIMER,
-        HEARTBEAT_TIMER,
         SYSTEM_TIMER_COUNT  // Must be last
     };
     
@@ -56,11 +52,8 @@ namespace TimingManager {
     
     // Convenience functions for common timers
     Timer& getPIDLogTimer();
-    Timer& getMAVLinkTimer();
-    Timer& getThrottleLogTimer();
+    Timer& getMotorLogTimer();
     Timer& getRudderReadTimer();
-    Timer& getSailReadTimer();
-    Timer& getHeartbeatTimer();
     
     // Utility functions
     uint32_t getSystemUptime();           // System uptime in milliseconds

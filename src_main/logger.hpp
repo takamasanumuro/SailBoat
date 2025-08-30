@@ -28,16 +28,6 @@ namespace Logger {
     void log(LogLevel level, const char* format, float value);
     void log(LogLevel level, const char* format, const char* str_value);
     
-    // Specialized logging functions for common sailboat operations
-    void logSystemStart(const char* system_name, const char* version);
-    void logActuatorCommand(const char* actuator, int command_value);
-    void logSensorReading(const char* sensor_name, int raw_value, float converted_value);
-    void logPIDOutput(const char* controller, int desired, int current, int error, int pwm_output);
-    void logMAVLinkMessage(const char* message_type, float data);
-    void logSafetyEvent(const char* event_description);
-    void logThrottleControl(int pwm_value);
-    void logCalibrationData(const char* actuator, int min_val, int max_val, float min_angle, float max_angle);
-    
     // Debug helpers - only active in debug builds
     void debugPrint(const char* message);
     void debugValue(const char* label, int value);

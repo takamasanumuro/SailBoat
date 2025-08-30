@@ -64,12 +64,8 @@ namespace TimingManager {
         system_start_time = millis();
         
         // Initialize system timers with their respective intervals from config
-        system_timers[PID_LOG_TIMER] = Timer(Config::Timing::PID_LOG_INTERVAL_MS);
-        system_timers[MAVLINK_PUBLISH_TIMER] = Timer(Config::Communication::MAVLink::PUBLISH_DELAY_MS);
-        system_timers[THROTTLE_LOG_TIMER] = Timer(Config::Timing::THROTTLE_LOG_INTERVAL_MS);
+        system_timers[MOTOR_LOG_TIMER] = Timer(Config::Timing::THROTTLE_LOG_INTERVAL_MS);
         system_timers[RUDDER_READ_TIMER] = Timer(Config::Timing::RUDDER_READ_INTERVAL_MS);
-        system_timers[SAIL_READ_TIMER] = Timer(Config::Timing::SAIL_READ_INTERVAL_MS);
-        system_timers[HEARTBEAT_TIMER] = Timer(Config::Timing::HEARTBEAT_INTERVAL_MS);
         
         timing_manager_initialized = true;
         Logger::log(Logger::INFO, "Timing manager initialized");
@@ -83,28 +79,12 @@ namespace TimingManager {
         return system_timers[timer_id];
     }
     
-    Timer& getPIDLogTimer() {
-        return getTimer(PID_LOG_TIMER);
-    }
-    
-    Timer& getMAVLinkTimer() {
-        return getTimer(MAVLINK_PUBLISH_TIMER);
-    }
-    
     Timer& getThrottleLogTimer() {
-        return getTimer(THROTTLE_LOG_TIMER);
+        return getTimer(MOTOR_LOG_TIMER);
     }
     
     Timer& getRudderReadTimer() {
         return getTimer(RUDDER_READ_TIMER);
-    }
-    
-    Timer& getSailReadTimer() {
-        return getTimer(SAIL_READ_TIMER);
-    }
-    
-    Timer& getHeartbeatTimer() {
-        return getTimer(HEARTBEAT_TIMER);
     }
     
     uint32_t getSystemUptime() {
