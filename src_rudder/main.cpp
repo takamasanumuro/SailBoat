@@ -6,8 +6,7 @@ extern "C" {
 }
 
 #ifdef RUDDER_TEST_MODE
-    #define TEST_VERSION "2.0.0"
-    #define TEST_NAME "Direct H-Bridge Controller"
+    #define TEST_NAME "Rudder H-Bridge Controller"
 #endif
 
 // Global H-bridge driver instance
@@ -422,9 +421,10 @@ namespace Commands {
 void setup() {
     Serial.begin(9600);
     delay(1000);
-    
-    Serial.println("Initializing H-bridge...");
-    
+
+    Serial.print("Starting: "); Serial.println(TEST_NAME);
+    Serial.println("====================================");
+
     // Configure H-bridge using explicit member initialization
     HBridgeDriverV2::Config rudder_cfg;
     rudder_cfg.pwm_pin = 10;
