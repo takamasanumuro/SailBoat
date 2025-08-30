@@ -1,4 +1,4 @@
-#include "HBridgeDriver_v2.hpp"
+#include "HBridgeDriver.hpp"
 
 // Using directive to simplify ErrorCode references
 using ErrorCode = HBridgeDriverV2::ErrorCode;

@@ -1,5 +1,4 @@
 #include "timing_manager.hpp"
-#include "logger.hpp"
 
 namespace TimingManager {
     
@@ -68,12 +67,12 @@ namespace TimingManager {
         system_timers[RUDDER_READ_TIMER] = Timer(Config::Timing::RUDDER_READ_INTERVAL_MS);
         
         timing_manager_initialized = true;
-        Logger::log(Logger::INFO, "Timing manager initialized");
+        Serial.println("Timing manager initialized");
     }
     
     Timer& getTimer(SystemTimerID timer_id) {
         if (timer_id >= SYSTEM_TIMER_COUNT) {
-            Logger::logError("Invalid timer ID requested");
+            Serial.println("ERROR: Invalid timer ID requested");
             return system_timers[0]; // Return default timer
         }
         return system_timers[timer_id];
@@ -124,7 +123,8 @@ namespace TimingManager {
     }
     
     void PrecisionTimer::logElapsed(const char* operation_name) const {
-        Logger::logTiming(operation_name, getElapsed());
+        Serial.print("TIMING: "); Serial.print(operation_name);
+        Serial.print(" took "); Serial.print(getElapsed()); Serial.println(" ms");
     }
     
     // Watchdog implementation
@@ -137,19 +137,19 @@ namespace TimingManager {
             watchdog_timeout_ms = timeout_ms;
             feed(); // Initialize feed time
             watchdog_enabled = true;
-            Logger::log(Logger::INFO, "Watchdog timer initialized with timeout: ", (int)timeout_ms);
+            Serial.print("Watchdog timer initialized with timeout: "); Serial.println((int)timeout_ms);
         }
         
         void feed() {
             last_feed_time = millis();
             if (watchdog_enabled) {
-                Logger::log(Logger::DEBUG, "Watchdog fed");
+                Serial.println("DEBUG: Watchdog fed");
             }
         }
         
         void disable() {
             watchdog_enabled = false;
-            Logger::log(Logger::INFO, "Watchdog timer disabled");
+            Serial.println("Watchdog timer disabled");
         }
         
         bool isEnabled() {
@@ -169,12 +169,12 @@ namespace TimingManager {
             
             uint32_t time_remaining = getTimeRemaining();
             if (time_remaining == 0) {
-                Logger::logCritical("Watchdog timeout detected!");
+                Serial.println("CRITICAL: Watchdog timeout detected!");
                 return false;
             }
             
             if (time_remaining < (watchdog_timeout_ms / 4)) {
-                Logger::logError("Watchdog timeout approaching");
+                Serial.println("ERROR: Watchdog timeout approaching");
             }
             
             return true;
