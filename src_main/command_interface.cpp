@@ -1,4 +1,19 @@
 #include "command_interface.hpp"
+#include <avr/pgmspace.h>
+
+// Store help strings in Flash memory (PROGMEM)
+const char PROGMEM help_header[] = "=== Available Commands ===";
+const char PROGMEM help_rudder[] = "rudder <-100-100>   - Set rudder percentage";
+const char PROGMEM help_motor[] = "motor <0-100>       - Set motor voltage percentage";
+const char PROGMEM help_angle[] = "angle <degrees>     - Set target angle for PID";
+const char PROGMEM help_pid[] = "pid [on|off]        - Enable/disable PID";
+const char PROGMEM help_tune[] = "tune <kp> <ki> <kd> - Adjust PID gains";
+const char PROGMEM help_analog[] = "analog [on|off]     - Enable/disable monitoring";
+const char PROGMEM help_status[] = "status              - Show system status";
+const char PROGMEM help_test[] = "test <-20-20>       - Safe motor test";
+const char PROGMEM help_stop[] = "stop                - Stop all systems";
+const char PROGMEM help_mavlink[] = "mavlink [status|channels] - Mavlink status";
+const char PROGMEM help_help[] = "help                - Show this help";
 
 namespace CommandInterface {
     
@@ -6,7 +21,7 @@ namespace CommandInterface {
     CommandProcessor processor;
     
     CommandProcessor::CommandProcessor() 
-        : buffer_index(0), analog_monitoring_enabled(false), last_analog_print(0) {
+        : buffer_index(0), analog_monitoring_enabled(false), last_analog_print(0), mavlink_instance(nullptr) {
     }
     
     void CommandProcessor::init() {
@@ -89,6 +104,9 @@ namespace CommandInterface {
         }
         else if (strcmp(command, "help") == 0) {
             handleHelpCommand();
+        }
+        else if (strcmp(command, "mavlink") == 0) {
+            handleMavlinkCommand(arg1);
         }
         else {
             Serial.print("Unknown command: "); Serial.print(command); Serial.println(". Type 'help' for available commands.");
@@ -244,25 +262,20 @@ namespace CommandInterface {
     }
     
     void CommandProcessor::handleHelpCommand() {
-        Serial.println("=== Available Commands ===");
-        Serial.println("rudder <-100-100>   - Set rudder percentage (manual control)");
-        Serial.println("motor <0-100>       - Set motor voltage percentage");
-        Serial.println("angle <degrees>     - Set target angle for PID control");
-        Serial.println("pid [on|off]        - Enable/disable PID or show status");
-        Serial.println("tune <kp> <ki> <kd> - Adjust PID gains");
-        Serial.println("tune                - Show current PID gains");
-        Serial.println("analog [on|off]     - Enable/disable analog monitoring");
-        Serial.println("analog              - Read analog value once");
-        Serial.println("status              - Show system status");
-        Serial.println("map <adc_min> <adc_max> <angle_min> <angle_max> - Set angle mapping");
-        Serial.println("test <-20-20>       - Safe motor test (auto-disables PID)");
-        Serial.println("stop                - Stop all systems");
-        Serial.println("help                - Show this help");
-        Serial.println("");
-        Serial.println("Quick PID presets:");
-        Serial.println("  tune 0.1 0.0 0.0    - Gentle P-only");
-        Serial.println("  tune 0.2 0.01 0.05  - Anti-oscillation (default)");
-        Serial.println("  tune 0.05 0.0 0.02  - Ultra-smooth");
+        Serial.println(reinterpret_cast<const __FlashStringHelper*>(help_header));
+        Serial.println(reinterpret_cast<const __FlashStringHelper*>(help_rudder));
+        Serial.println(reinterpret_cast<const __FlashStringHelper*>(help_motor));
+        Serial.println(reinterpret_cast<const __FlashStringHelper*>(help_angle));
+        Serial.println(reinterpret_cast<const __FlashStringHelper*>(help_pid));
+        Serial.println(reinterpret_cast<const __FlashStringHelper*>(help_tune));
+        Serial.println(reinterpret_cast<const __FlashStringHelper*>(help_analog));
+        Serial.println(reinterpret_cast<const __FlashStringHelper*>(help_status));
+        Serial.println(reinterpret_cast<const __FlashStringHelper*>(help_test));
+        Serial.println(reinterpret_cast<const __FlashStringHelper*>(help_stop));
+        Serial.println(reinterpret_cast<const __FlashStringHelper*>(help_mavlink));
+        Serial.println(reinterpret_cast<const __FlashStringHelper*>(help_help));
+        Serial.println(F(""));
+        Serial.println(F("Presets: tune 0.1 0 0 | tune 0.2 0.01 0.05 | tune 0.05 0 0.02"));
     }
     
     void CommandProcessor::showCurrentPIDValues() {
@@ -291,5 +304,38 @@ namespace CommandInterface {
         Serial.print("V, "); Serial.print(angle, 1);
         Serial.println("°)");
         last_analog_print = current_time;
+    }
+    
+    void CommandProcessor::setMavlinkInstance(MavlinkCommunication* mavlink_ptr) {
+        mavlink_instance = mavlink_ptr;
+    }
+    
+    void CommandProcessor::handleMavlinkCommand(const char* arg) {
+        if (!mavlink_instance) {
+            Serial.println("Mavlink instance not set!");
+            return;
+        }
+        
+        if (!arg) {
+            // No argument - show status
+            mavlink_instance->print_status();
+        }
+        else if (strcmp(arg, "status") == 0) {
+            mavlink_instance->print_status();
+        }
+        else if (strcmp(arg, "channels") == 0) {
+            mavlink_instance->print_rc_channels();
+        }
+        else if (strcmp(arg, "help") == 0) {
+            Serial.println("=== Mavlink Commands ===");
+            Serial.println("mavlink           - Show Mavlink status");
+            Serial.println("mavlink status    - Show Mavlink status");
+            Serial.println("mavlink channels  - Show RC channel values");
+            Serial.println("mavlink help      - Show this help");
+        }
+        else {
+            Serial.print("Unknown mavlink command: "); Serial.println(arg);
+            Serial.println("Use 'mavlink help' for available commands.");
+        }
     }
 }

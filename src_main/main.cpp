@@ -4,10 +4,14 @@
 #include "rudder_control.hpp"
 #include "command_interface.hpp"
 #include "analog_voltage_generator.hpp"
+#include "mavlink_communication.hpp"
 
 #ifdef ENVIRONMENT_MAIN
     #define TEST_NAME "Integrated Sailboat Autopilot System"
 #endif
+
+// Global Mavlink communication instance
+MavlinkCommunication mavlink;
 
 void setup() {
     Serial.begin(Config::System::SERIAL_BAUD_RATE);
@@ -51,6 +55,12 @@ void setup() {
     
     // Initialize command interface
     CommandInterface::processor.init();
+    
+    // Initialize Mavlink communication
+    mavlink.initialize();
+    
+    // Set mavlink instance in command processor
+    CommandInterface::processor.setMavlinkInstance(&mavlink);
 
 	Serial.println("System initialization complete");
     Serial.println();
@@ -94,14 +104,47 @@ void setup() {
 }
 
 void loop() {
-    // Process user commands
-    CommandInterface::processor.processInput();
+    // Update Mavlink communication (highest priority)
+    mavlink.update();
     
-    // Update analog monitoring if enabled
-    CommandInterface::processor.updateAnalogMonitoring();
-    
-    // Update rudder PID control
-    RudderControl::controller.updatePID();
-    
-    delay(10);
+    // Check if Mavlink has control priority
+    if (mavlink.has_valid_data()) {
+        // Mavlink takes priority - apply RC commands
+        int rudder_cmd = mavlink.get_rudder_command();
+        int throttle_cmd = mavlink.get_throttle_command();
+        MavlinkCommunication::ControlMode mode = mavlink.get_control_mode();
+        
+        // Apply rudder control based on mode
+        if (mode == MavlinkCommunication::ControlMode::ANGLE_CONTROL) {
+            // Convert rudder command to angle and use PID control
+            //Enable PID first
+            RudderControl::controller.enablePID(true);
+            float target_angle = map(rudder_cmd, -100, 100, 
+                                   Config::RudderAngle::ANGLE_MIN, 
+                                   Config::RudderAngle::ANGLE_MAX);
+            RudderControl::controller.setAngleTarget(target_angle);
+        } else {
+            // Direct speed control
+            RudderControl::controller.enablePID(false);
+            RudderControl::controller.setPercentage(rudder_cmd);
+            Serial.print(F("Rudder (CH0): ")); Serial.print(rudder_cmd); Serial.println(F("%"));
+        }
+        
+        // Apply throttle control
+        AnalogVoltageGenerator::generator.setVoltagePercentage(throttle_cmd);
+        
+        // Update PID control if in angle mode
+        if (mode == MavlinkCommunication::ControlMode::ANGLE_CONTROL) {
+            RudderControl::controller.updatePID();
+        }
+    } else {
+        // Manual/GUI control mode - process user commands
+        CommandInterface::processor.processInput();
+        
+        // Update analog monitoring if enabled
+        CommandInterface::processor.updateAnalogMonitoring();
+        
+        // Update rudder PID control
+        RudderControl::controller.updatePID();
+    }
 }

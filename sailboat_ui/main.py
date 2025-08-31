@@ -448,7 +448,7 @@ class SailboatUI:
                 messagebox.showerror("Error", "Please select a port")
                 return
             
-            if self.serial_manager.connect(port):
+            if self.serial_manager.connect(port, 115200):
                 self.status_label.config(text="Connected", foreground="green")
                 self.connect_btn.config(text="Disconnect")
             else:

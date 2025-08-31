@@ -6,7 +6,7 @@ namespace Config {
     // System Information
     namespace System {
         constexpr const char* NAME = "Actuator/ADC interface for Pixhawk autopilot";
-        constexpr uint32_t SERIAL_BAUD_RATE = 9600;
+        constexpr uint32_t SERIAL_BAUD_RATE = 115200;
     }
 
     // Hardware Pin Definitions

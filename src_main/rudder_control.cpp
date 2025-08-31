@@ -111,20 +111,24 @@ namespace RudderControl {
         percentage = constrain(percentage, -Config::RudderAngle::MOTOR_POWER_LIMIT, 
                                Config::RudderAngle::MOTOR_POWER_LIMIT);
         
-        // DEBUG: Print PID output values
-        int current_angle_scaled = pidSourceCallback();
-        int error = instance->pid_controller->target - current_angle_scaled;
-        Serial.print("PID Raw Output: "); Serial.print(output);
-        Serial.print(", Error (deg*10): "); Serial.print(error);
-        Serial.print(", Motor %: "); Serial.print(percentage, 1);
-        Serial.print(", Current Angle: "); Serial.print((float)current_angle_scaled / 10.0f, 1);
-        Serial.print(", Target Angle: "); Serial.println((float)instance->pid_controller->target / 10.0f, 1);
-        
-        // Show PID components for debugging
-        if (instance->pid_controller != nullptr) {
-            Serial.print("P="); Serial.print(instance->pid_controller->p * error, 2);
-            Serial.print(", I="); Serial.print(instance->pid_controller->i * instance->pid_controller->integralCumulation, 2);
-            Serial.print(", D="); Serial.println(instance->pid_controller->d * instance->pid_controller->cycleDerivative, 2);
+        // DEBUG: Print PID output values every 2 seconds (0.5Hz)
+        static unsigned long last_debug_time = 0;
+        unsigned long now = millis();
+        if (now - last_debug_time >= 500) {
+            last_debug_time = now;
+            int current_angle_scaled = pidSourceCallback();
+            int error = instance->pid_controller->target - current_angle_scaled;
+            Serial.print("PID Raw Output: "); Serial.print(output);
+            Serial.print(", Error (deg*10): "); Serial.print(error);
+            Serial.print(", Motor %: "); Serial.print(percentage, 1);
+            Serial.print(", Current Angle: "); Serial.print((float)current_angle_scaled / 10.0f, 1);
+            Serial.print(", Target Angle: "); Serial.println((float)instance->pid_controller->target / 10.0f, 1);
+            // Show PID components for debugging
+            if (instance->pid_controller != nullptr) {
+                Serial.print("P="); Serial.print(instance->pid_controller->p * error, 2);
+                Serial.print(", I="); Serial.print(instance->pid_controller->i * instance->pid_controller->integralCumulation, 2);
+                Serial.print(", D="); Serial.println(instance->pid_controller->d * instance->pid_controller->cycleDerivative, 2);
+            }
         }
         
         // Dead zone to prevent jitter
@@ -167,13 +171,18 @@ namespace RudderControl {
         target_angle = constrain(angle, angle_config.angle_min, angle_config.angle_max);
         pid_controller->target = (int)(target_angle * 10.0f);
         
-        Serial.print("Set angle target: "); Serial.print(target_angle, 1);
-        Serial.print("° -> Scaled Target: "); Serial.println(pid_controller->target);
+        static unsigned long last_print_time = 0;
+        if (millis() - last_print_time > 1000) {  // Print every second
+            last_print_time = millis();
+            Serial.print("Set angle target: "); Serial.print(target_angle, 1);
+            Serial.print("° -> Scaled Target: "); Serial.println(pid_controller->target);
+        }
     }
     
     void RudderController::enablePID(bool enable) {
         if (pid_controller == nullptr) return;
-        
+        if (pid_controller->enabled) return;
+
         pid_enabled = enable;
         setEnabled(pid_controller, enable ? 1 : 0);
         

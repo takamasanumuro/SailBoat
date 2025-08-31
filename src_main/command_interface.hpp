@@ -3,6 +3,7 @@
 #include "config.hpp"
 #include "rudder_control.hpp"
 #include "analog_voltage_generator.hpp"
+#include "mavlink_communication.hpp"
 
 namespace CommandInterface {
     
@@ -25,6 +26,7 @@ namespace CommandInterface {
         void handleTestCommand(const char* arg);
         void handleStopCommand();
         void handleHelpCommand();
+        void handleMavlinkCommand(const char* arg);
         
         // Helper functions
         void parseCommand(const char* cmd);
@@ -36,6 +38,10 @@ namespace CommandInterface {
         void init();
         void processInput();
         void updateAnalogMonitoring();
+        void setMavlinkInstance(MavlinkCommunication* mavlink_ptr);
+        
+    private:
+        MavlinkCommunication* mavlink_instance;
     };
     
     // Global instance
