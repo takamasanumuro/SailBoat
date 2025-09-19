@@ -181,7 +181,6 @@ namespace RudderControl {
     
     void RudderController::enablePID(bool enable) {
         if (pid_controller == nullptr) return;
-        if (pid_controller->enabled) return;
 
         pid_enabled = enable;
         setEnabled(pid_controller, enable ? 1 : 0);
