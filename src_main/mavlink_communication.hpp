@@ -72,7 +72,7 @@ public:
     uint32_t get_last_message_time() const { return last_mavlink_message_time; }
     
     // RC channel access methods
-    int get_rudder_command() const;          // Returns -100 to +100
+    int get_rudder_command_percentage() const;          // Returns -100 to +100
     int get_throttle_command() const;        // Returns 0 to 100
     ControlMode get_control_mode() const;    // Returns current control mode
     

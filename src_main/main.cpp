@@ -106,35 +106,46 @@ void setup() {
 void loop() {
     // Update Mavlink communication (highest priority)
     mavlink.update();
+    static MavlinkCommunication::ControlMode last_mode = MavlinkCommunication::ControlMode::ANGLE_CONTROL;
     
     // Check if Mavlink has control priority
     if (mavlink.has_valid_data()) {
         // Mavlink takes priority - apply RC commands
-        int rudder_cmd = mavlink.get_rudder_command();
+        int rudder_cmd = mavlink.get_rudder_command_percentage();
         int throttle_cmd = mavlink.get_throttle_command();
-        MavlinkCommunication::ControlMode mode = mavlink.get_control_mode();
-        
-        // Apply rudder control based on mode
-        if (mode == MavlinkCommunication::ControlMode::ANGLE_CONTROL) {
-            // Convert rudder command to angle and use PID control
-            //Enable PID first
-            RudderControl::controller.enablePID(true);
+        MavlinkCommunication::ControlMode current_mode = mavlink.get_control_mode();
+
+        // State change detection for rudder control
+        if (current_mode != last_mode) {
+            if (current_mode == MavlinkCommunication::ControlMode::ANGLE_CONTROL) {
+                // Switched TO angle control
+                RudderControl::controller.enablePID(true);
+            } else {
+                // Switched AWAY from angle control (to speed control)
+                RudderControl::controller.enablePID(false);
+            }
+            // Update the previous mode to the new mode
+            last_mode = current_mode;
+        }
+    
+        // Rudder control logic
+        if (current_mode == MavlinkCommunication::ControlMode::ANGLE_CONTROL) {
+            // Map rudder command to a target angle
             float target_angle = map(rudder_cmd, -100, 100, 
-                                   Config::RudderAngle::ANGLE_MIN, 
-                                   Config::RudderAngle::ANGLE_MAX);
+                                    Config::RudderAngle::ANGLE_MIN, 
+                                    Config::RudderAngle::ANGLE_MAX);
             RudderControl::controller.setAngleTarget(target_angle);
         } else {
             // Direct speed control
-            RudderControl::controller.enablePID(false);
             RudderControl::controller.setPercentage(rudder_cmd);
-            Serial.print(F("Rudder (CH0): ")); Serial.print(rudder_cmd); Serial.println(F("%"));
+            // Serial.print(F("Rudder (CH0): ")); Serial.print(rudder_cmd); Serial.println(F("%"));
         }
         
         // Apply throttle control
         AnalogVoltageGenerator::generator.setVoltagePercentage(throttle_cmd);
         
         // Update PID control if in angle mode
-        if (mode == MavlinkCommunication::ControlMode::ANGLE_CONTROL) {
+        if (current_mode == MavlinkCommunication::ControlMode::ANGLE_CONTROL) {
             RudderControl::controller.updatePID();
         }
     } else {

@@ -132,16 +132,22 @@ bool MavlinkCommunication::is_mavlink_timeout() const {
     return (millis() - last_mavlink_message_time) > TIMEOUT_MS;
 }
 
-int MavlinkCommunication::get_rudder_command() const {
+int MavlinkCommunication::get_rudder_command_percentage() const {
     if (!has_valid_data()) {
         return 0;  // No valid data, return neutral
     }
-    
+
     // Convert PWM (1000-2000) to command range (-100 to +100)
     int pwm = rc_channels.rudder_value;
     if (pwm < 1000) pwm = 1000;
     if (pwm > 2000) pwm = 2000;
-    
+
+    // Add a deadzone of +/- 20 around the neutral 1500 to avoid jitter
+    const int deadzone = 20;
+    if (abs(pwm - 1500) < deadzone) {
+        return 0; // Input is inside the deadzone, return neutral
+    }
+
     // Map 1000-2000 to -100 to +100
     return map(pwm, 1000, 2000, -100, 100);
 }
@@ -186,7 +192,7 @@ void MavlinkCommunication::print_status() const {
     if (has_valid_data()) {
         Serial.print(F("Control Mode: "));
         Serial.println(get_control_mode() == ControlMode::ANGLE_CONTROL ? F("PID ANGLE") : F("SPEED"));
-        Serial.print(F("Rudder: ")); Serial.print(get_rudder_command()); Serial.println(F("%"));
+        Serial.print(F("Rudder: ")); Serial.print(get_rudder_command_percentage()); Serial.println(F("%"));
         Serial.print(F("Throttle: ")); Serial.print(get_throttle_command()); Serial.println(F("%"));
     }
     Serial.println(reinterpret_cast<const __FlashStringHelper*>(mavlink_status_footer));
@@ -200,7 +206,7 @@ void MavlinkCommunication::print_rc_channels() const {
     
     Serial.println(reinterpret_cast<const __FlashStringHelper*>(mavlink_channels_header));
     Serial.print(F("Rudder: ")); Serial.print(rc_channels.rudder_value); 
-    Serial.print(F(" -> ")); Serial.print(get_rudder_command()); Serial.println(F("%"));
+    Serial.print(F(" -> ")); Serial.print(get_rudder_command_percentage()); Serial.println(F("%"));
     
     Serial.print(F("Throttle: ")); Serial.print(rc_channels.throttle_value); 
     Serial.print(F(" -> ")); Serial.print(get_throttle_command()); Serial.println(F("%"));
