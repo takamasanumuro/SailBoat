@@ -38,10 +38,11 @@ private:
     
     // RC channel data
     struct RCChannels {
-        uint16_t rudder_value;      // Channel 0: Rudder control (1000-2000)
-        uint16_t throttle_value;    // Channel 1: Throttle control (1000-2000) 
-        uint16_t mode_value;        // Channel 6: Control mode (1000-2000)
-        uint16_t arm_value;         // Channel 5: Arm/disarm (1000-2000)
+        uint16_t rudder_value; 
+        uint16_t throttle_value;
+        uint16_t mode_value;
+        uint16_t motor_reverse_value;   
+        uint16_t motor_arm_value;          
         bool valid;                 // True if recent data available
         uint32_t timestamp;         // Last update time
     } rc_channels;
@@ -63,6 +64,7 @@ public:
     struct MotorOutput {
         int percentage;
         bool should_reverse;
+        bool is_armed;
     };
     
     // Constructor

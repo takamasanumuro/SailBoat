@@ -118,7 +118,8 @@ void MavlinkCommunication::handle_servo_output(const mavlink_servo_output_raw_t&
     // Update RC channel data from servo output (these are the commands we need)
     rc_channels.rudder_value = servo_output.servo1_raw;   
     rc_channels.throttle_value = servo_output.servo3_raw; 
-    rc_channels.arm_value = servo_output.servo5_raw;     
+    rc_channels.motor_reverse_value = servo_output.servo5_raw;     
+    rc_channels.motor_arm_value = servo_output.servo6_raw;
     rc_channels.mode_value = servo_output.servo7_raw;     
     rc_channels.valid = true;
     rc_channels.timestamp = millis();
@@ -163,10 +164,11 @@ MavlinkCommunication::MotorOutput MavlinkCommunication::get_throttle_command() c
     if (pwm < 1000) pwm = 1000;
     if (pwm > 2000) pwm = 2000;
 
-    bool should_reverse = rc_channels.arm_value > 1700; // Channel 5 HIGH = reverse
+    bool should_reverse = rc_channels.motor_reverse_value > 1700; // Channel 5 HIGH = reverse
+    bool is_armed = rc_channels.motor_arm_value > 1700; // Channel 6 HIGH = armed
     
     // Map 1000-2000 to 0 to 100
-    return {map(pwm, 1000, 2000, 0, 100), should_reverse};
+    return {map(pwm, 1000, 2000, 0, 100), should_reverse, is_armed};
 }
 
 MavlinkCommunication::ControlMode MavlinkCommunication::get_control_mode() const {

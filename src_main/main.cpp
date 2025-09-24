@@ -159,6 +159,7 @@ void loop() {
         // Apply throttle control
         AnalogVoltageGenerator::generator.setVoltagePercentage(throttle_cmd.percentage);
         digitalWrite(relay_one_pin, throttle_cmd.should_reverse ? LOW : HIGH); // Relay for direction
+        digitalWrite(relay_two_pin, throttle_cmd.is_armed ? LOW : HIGH); // Relay for arming
 
         
         // Update PID control if in angle mode
