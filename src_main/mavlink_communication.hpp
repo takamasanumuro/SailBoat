@@ -41,6 +41,7 @@ private:
         uint16_t rudder_value;      // Channel 0: Rudder control (1000-2000)
         uint16_t throttle_value;    // Channel 1: Throttle control (1000-2000) 
         uint16_t mode_value;        // Channel 6: Control mode (1000-2000)
+        uint16_t arm_value;         // Channel 5: Arm/disarm (1000-2000)
         bool valid;                 // True if recent data available
         uint32_t timestamp;         // Last update time
     } rc_channels;
@@ -58,6 +59,11 @@ public:
         SPEED_CONTROL,    // Direct speed control
         ANGLE_CONTROL     // PID angle control
     };
+
+    struct MotorOutput {
+        int percentage;
+        bool should_reverse;
+    };
     
     // Constructor
     MavlinkCommunication();
@@ -73,7 +79,7 @@ public:
     
     // RC channel access methods
     int get_rudder_command_percentage() const;          // Returns -100 to +100
-    int get_throttle_command() const;        // Returns 0 to 100
+    MotorOutput get_throttle_command() const;        // Returns 0 to 100% and reverse flag
     ControlMode get_control_mode() const;    // Returns current control mode
     
     // Debug methods

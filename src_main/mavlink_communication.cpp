@@ -118,7 +118,8 @@ void MavlinkCommunication::handle_servo_output(const mavlink_servo_output_raw_t&
     // Update RC channel data from servo output (these are the commands we need)
     rc_channels.rudder_value = servo_output.servo1_raw;   
     rc_channels.throttle_value = servo_output.servo3_raw; 
-    rc_channels.mode_value = servo_output.servo6_raw;     
+    rc_channels.arm_value = servo_output.servo5_raw;     
+    rc_channels.mode_value = servo_output.servo7_raw;     
     rc_channels.valid = true;
     rc_channels.timestamp = millis();
     
@@ -152,18 +153,20 @@ int MavlinkCommunication::get_rudder_command_percentage() const {
     return map(pwm, 1000, 2000, -100, 100);
 }
 
-int MavlinkCommunication::get_throttle_command() const {
+MavlinkCommunication::MotorOutput MavlinkCommunication::get_throttle_command() const {
     if (!has_valid_data()) {
-        return 0;  // No valid data, return zero throttle
+        return {0, false};  // No valid data, return zero throttle
     }
     
     // Convert PWM (1000-2000) to throttle range (0 to 100)
     int pwm = rc_channels.throttle_value;
     if (pwm < 1000) pwm = 1000;
     if (pwm > 2000) pwm = 2000;
+
+    bool should_reverse = rc_channels.arm_value > 1700; // Channel 5 HIGH = reverse
     
     // Map 1000-2000 to 0 to 100
-    return map(pwm, 1000, 2000, 0, 100);
+    return {map(pwm, 1000, 2000, 0, 100), should_reverse};
 }
 
 MavlinkCommunication::ControlMode MavlinkCommunication::get_control_mode() const {
@@ -193,7 +196,7 @@ void MavlinkCommunication::print_status() const {
         Serial.print(F("Control Mode: "));
         Serial.println(get_control_mode() == ControlMode::ANGLE_CONTROL ? F("PID ANGLE") : F("SPEED"));
         Serial.print(F("Rudder: ")); Serial.print(get_rudder_command_percentage()); Serial.println(F("%"));
-        Serial.print(F("Throttle: ")); Serial.print(get_throttle_command()); Serial.println(F("%"));
+        Serial.print(F("Throttle: ")); Serial.print(get_throttle_command().percentage); Serial.println(F("%"));
     }
     Serial.println(reinterpret_cast<const __FlashStringHelper*>(mavlink_status_footer));
 }
@@ -209,7 +212,7 @@ void MavlinkCommunication::print_rc_channels() const {
     Serial.print(F(" -> ")); Serial.print(get_rudder_command_percentage()); Serial.println(F("%"));
     
     Serial.print(F("Throttle: ")); Serial.print(rc_channels.throttle_value); 
-    Serial.print(F(" -> ")); Serial.print(get_throttle_command()); Serial.println(F("%"));
+    Serial.print(F(" -> ")); Serial.print(get_throttle_command().percentage); Serial.println(F("%"));
     
     Serial.print(F("Mode: ")); Serial.print(rc_channels.mode_value); 
     Serial.print(F(" -> ")); Serial.println(get_control_mode() == ControlMode::ANGLE_CONTROL ? F("PID") : F("SPEED"));

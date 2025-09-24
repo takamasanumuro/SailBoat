@@ -14,6 +14,12 @@
 MavlinkCommunication mavlink;
 MavlinkCommunication::ControlMode last_mode = MavlinkCommunication::ControlMode::ANGLE_CONTROL;
 
+constexpr int relay_one_pin = 53;
+constexpr int relay_two_pin = 52;
+constexpr int relay_three_pin = 51;
+constexpr int relay_four_pin = 50;
+
+
 void setup() {
     Serial.begin(Config::System::SERIAL_BAUD_RATE);
     
@@ -103,6 +109,12 @@ void setup() {
     Serial.print(" to "); Serial.print(Config::Control::MotorVoltage::MAX_VOLTAGE_MV); Serial.println(" mV");
     Serial.println("======================");
 
+    // Initialize relay pins
+    pinMode(relay_one_pin, OUTPUT); digitalWrite(relay_one_pin, HIGH);
+    pinMode(relay_two_pin, OUTPUT); digitalWrite(relay_two_pin, HIGH);
+    pinMode(relay_three_pin, OUTPUT); digitalWrite(relay_three_pin, HIGH);
+    pinMode(relay_four_pin, OUTPUT); digitalWrite(relay_four_pin, HIGH);
+
     RudderControl::controller.enablePID(true); // Default to PID enabled
 }
 
@@ -115,7 +127,7 @@ void loop() {
     if (mavlink.has_valid_data()) {
         // Mavlink takes priority - apply RC commands
         int rudder_cmd = mavlink.get_rudder_command_percentage();
-        int throttle_cmd = mavlink.get_throttle_command();
+        MavlinkCommunication::MotorOutput throttle_cmd = mavlink.get_throttle_command();
         MavlinkCommunication::ControlMode current_mode = mavlink.get_control_mode();
 
         // State change detection for rudder control
@@ -145,7 +157,9 @@ void loop() {
         }
         
         // Apply throttle control
-        AnalogVoltageGenerator::generator.setVoltagePercentage(throttle_cmd);
+        AnalogVoltageGenerator::generator.setVoltagePercentage(throttle_cmd.percentage);
+        digitalWrite(relay_one_pin, throttle_cmd.should_reverse ? LOW : HIGH); // Relay for direction
+
         
         // Update PID control if in angle mode
         if (current_mode == MavlinkCommunication::ControlMode::ANGLE_CONTROL) {

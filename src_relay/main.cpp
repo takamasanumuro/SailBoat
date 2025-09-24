@@ -10,15 +10,10 @@ constexpr int interval_ms = 3000;
 
 
 void setup() {
-    pinMode(relay_one_pin, OUTPUT);
-    pinMode(relay_two_pin, OUTPUT);
-    pinMode(relay_three_pin, OUTPUT);
-    pinMode(relay_four_pin, OUTPUT);
-
-    digitalWrite(relay_one_pin, HIGH);
-    digitalWrite(relay_two_pin, HIGH);
-    digitalWrite(relay_three_pin, HIGH);
-    digitalWrite(relay_four_pin, HIGH);
+    pinMode(relay_one_pin, OUTPUT); digitalWrite(relay_one_pin, HIGH);
+    pinMode(relay_two_pin, OUTPUT); digitalWrite(relay_two_pin, HIGH);
+    pinMode(relay_three_pin, OUTPUT); digitalWrite(relay_three_pin, HIGH);
+    pinMode(relay_four_pin, OUTPUT); digitalWrite(relay_four_pin, HIGH);
 }
 
 void loop() {
