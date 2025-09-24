@@ -29,7 +29,7 @@ void MavlinkCommunication::initialize() {
     pinMode(COMM_GND_PIN, OUTPUT);
     digitalWrite(COMM_GND_PIN, LOW);
     
-    Serial.println(F("Mavlink ready: CH0=Rudder, CH1=Throttle, CH6=Mode"));
+    Serial.println(F("Mavlink ready: CH1=Rudder, CH3=Throttle, CH5=Arm, CH6=Mode"));
 }
 
 void MavlinkCommunication::update() {
@@ -116,8 +116,8 @@ void MavlinkCommunication::handle_rc_channels(const mavlink_rc_channels_t& chann
 
 void MavlinkCommunication::handle_servo_output(const mavlink_servo_output_raw_t& servo_output) {
     // Update RC channel data from servo output (these are the commands we need)
-    rc_channels.throttle_value = servo_output.servo1_raw; 
-    rc_channels.rudder_value = servo_output.servo2_raw;   
+    rc_channels.rudder_value = servo_output.servo1_raw;   
+    rc_channels.throttle_value = servo_output.servo3_raw; 
     rc_channels.mode_value = servo_output.servo6_raw;     
     rc_channels.valid = true;
     rc_channels.timestamp = millis();

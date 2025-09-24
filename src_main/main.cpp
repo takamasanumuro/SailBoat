@@ -12,6 +12,7 @@
 
 // Global Mavlink communication instance
 MavlinkCommunication mavlink;
+MavlinkCommunication::ControlMode last_mode = MavlinkCommunication::ControlMode::ANGLE_CONTROL;
 
 void setup() {
     Serial.begin(Config::System::SERIAL_BAUD_RATE);
@@ -101,6 +102,8 @@ void setup() {
     Serial.print("Motor voltage range: "); Serial.print(Config::Control::MotorVoltage::MIN_VOLTAGE_MV);
     Serial.print(" to "); Serial.print(Config::Control::MotorVoltage::MAX_VOLTAGE_MV); Serial.println(" mV");
     Serial.println("======================");
+
+    RudderControl::controller.enablePID(true); // Default to PID enabled
 }
 
 void loop() {
